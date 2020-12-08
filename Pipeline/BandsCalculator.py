@@ -75,12 +75,16 @@ class BandCalculator:
         return path  # path where it is saved
 
     @staticmethod
+    def ndvi(red: np.ndarray, nir: np.ndarray):
+        ndvi1 = (nir - red)
+        ndvi2 = (nir + red)
+        return np.divide(ndvi1, ndvi2, out=np.zeros_like(ndvi1), where=ndvi2 != 0).squeeze()
+
+    @staticmethod
     def s2_ndvi(worker: S2Worker, save: bool = False):
         nir = worker['B8A'].raster().astype(float)
         red = worker['B04'].raster().astype(float)
-        ndvi1 = (nir - red)
-        ndvi2 = (nir + red)
-        ndvi = np.divide(ndvi1, ndvi2, out=np.zeros_like(ndvi1), where=ndvi2 != 0).squeeze()
+        ndvi = BandCalculator.ndvi(red, nir)
         worker.temp["NDVI"] = ndvi
         if not save:
             return ndvi
