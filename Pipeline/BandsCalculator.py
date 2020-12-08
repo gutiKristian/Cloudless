@@ -36,7 +36,7 @@ class BandCalculator:
         if driver == "GTiff":
             path += ".tif"
         elif driver == "OpenJPEG200":
-            path += ".jp"
+            path += ".jp2"
         else:
             raise Exception("Format is not yet supported!")
 
