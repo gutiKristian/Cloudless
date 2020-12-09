@@ -42,7 +42,7 @@ class S2Runner:
         for key in self.result.keys():
             path = self.save_result_path + "/" + key + "_" + str(self.spatial_resolution)
             BandCalculator.save_band(raster_img=self.result[key], name=key + "_" + str(self.spatial_resolution),
-                                     path=path, geo_transform=geo_transform, projection=projection)
+                                     path=path)
 
     def run_ndvi_cloud_masking(self) -> int:
         """
