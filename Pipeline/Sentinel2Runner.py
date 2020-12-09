@@ -1,8 +1,10 @@
 import math
+import time
 
 from Pipeline.utils import *
 from Pipeline.PipelineWorker import *
 from Pipeline.BandsCalculator import *
+from Pipeline.Masks import *
 
 
 class S2Runner:
@@ -60,7 +62,11 @@ class S2Runner:
             worker.temp["NDVI"] = np.ma.array(worker.temp["NDVI"], mask=~mask, fill_value=0).filled()
             del mask
         print("done")
-        self._s2_pixel_analysis()
+        start = time.time()
+        # self._s2_pixel_analysis()
+        self._s2_jit_pixel_analysis()
+        end = time.time()
+        print("Elapsed time - masking = %s" % (end - start))
         self._save_result()
         return 0
 
@@ -84,4 +90,40 @@ class S2Runner:
                     self.result[band][y][x] = self.workers[index][band].raster()[y][x]
             if y % 100 == 0 and y != 0:
                 print("Masked {} bands".format(y))
+        self.result["DOY"] = doy
+
+    def _s2_jit_pixel_analysis(self):
+        # Prepare the data
+        result_bands = ["B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B11", "B12", "AOT"]
+        res_x, res_y = s2_get_resolution(self.spatial_resolution)
+        result = np.zeros(shape=(len(result_bands), res_x, res_y), dtype=np.uint16)
+        doy = np.zeros(shape=(res_x, res_y), dtype=np.uint16)
+
+        # Using multithreading
+        start = time.time()
+        for worker in self.workers:
+            worker.load_bands()
+        end = time.time()
+        print("Elapsed time - opening datasets = %s" % (end - start))
+
+        # stacking, preparation for numba
+        ndvi = np.ndarray((len(self.workers), res_x, res_y))
+        data_bands = np.ndarray((len(self.workers), len(result_bands), res_x, res_y))
+        doys = np.array([w.doy for w in self.workers])
+
+        start = time.time()
+        for i, worker in enumerate(self.workers, 0):
+            ndvi[i] = worker.temp["NDVI"]
+            data_bands[i] = worker.stack_bands(result_bands)
+        end = time.time()
+        print("Elapsed time - stacking= %s" % (end - start))
+
+        start = time.time()
+        result, doy = S2JIT.s2_pixel_analysis(ndvi, data_bands, doys, result, doy, res_x, res_y)
+        end = time.time()
+        print("Elapsed time - masking = %s" % (end - start))
+
+        # Init
+        for i, band in enumerate(result_bands, 0):
+            self.result[band] = result[i]
         self.result["DOY"] = doy

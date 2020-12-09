@@ -1,7 +1,9 @@
+import threading
 from datetime import datetime
 from xml.etree import ElementTree  # xml
 from osgeo import gdal
 from Pipeline.PipelineBand import *
+from Pipeline.utils import *
 
 gdal.UseExceptions()
 
@@ -10,6 +12,7 @@ class S2Worker:
     """
     This class can be instantiated only inside S2Runner.
     """
+
     def __init__(self, path: str, spatial_res: int):
         if not is_dir_valid(path):
             raise FileNotFoundError('Data set has not been found !')
@@ -68,12 +71,38 @@ class S2Worker:
     def add_another_band(self) -> None:
         pass  # TODO: RESAMPLE AND UPDATE THE DICT
 
+    def _load_bands(self, key: str):
+        self.bands[self.spatial_resolution][key].load_raster()
+
+    def load_bands(self):
+        threads = []
+        for _key in self.bands[self.spatial_resolution]:
+            t = threading.Thread(target=self._load_bands, args=[_key])
+            t.start()
+            threads.append(t)
+        for t in threads:
+            t.join()
+
     def free_resources(self) -> None:
         for key, band in self.bands[self.spatial_resolution]:
             band.free_resources()
 
     def update_worker(self, name: str, path: str):
         self.bands[self.spatial_resolution][name] = Band(path)
+
+    def stack_bands(self, desired_order: List[str] = None) -> np.ndarray:
+        """
+        Methods stacks all available bands.
+        It forms a cube of bands.
+        @param desired_order: user may set his order
+        """
+        if desired_order is None:
+            desired_order = list(self.bands[self.spatial_resolution].keys())
+        res_x, res_y = s2_get_resolution(self.spatial_resolution)
+        result = np.ndarray((len(desired_order), res_x, res_y))
+        for i, key in enumerate(desired_order, 0):
+            result[i] = self.bands[self.spatial_resolution][key].raster()
+        return result
 
     def __getitem__(self, item):
         """
