@@ -21,6 +21,6 @@ class S2JIT:
                         index = i
                 doy[y][x] = doys[index]
                 #  Access worker bands, j - band index
-                for j in range(len(data[i])):
+                for j in range(len(data[index])):
                     result[j][y][x] = data[index][j][y][x]
         return result, doy
