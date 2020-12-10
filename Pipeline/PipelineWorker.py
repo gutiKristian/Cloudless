@@ -1,4 +1,3 @@
-import threading
 from datetime import datetime
 from xml.etree import ElementTree  # xml
 from osgeo import gdal
@@ -71,17 +70,11 @@ class S2Worker:
     def add_another_band(self) -> None:
         pass  # TODO: RESAMPLE AND UPDATE THE DICT
 
-    def _load_bands(self, key: str):
-        self.bands[self.spatial_resolution][key].load_raster()
-
-    def load_bands(self):
-        threads = []
-        for _key in self.bands[self.spatial_resolution]:
-            t = threading.Thread(target=self._load_bands, args=[_key])
-            t.start()
-            threads.append(t)
-        for t in threads:
-            t.join()
+    def load_bands(self, desired_bands: List[str] = None):
+        if desired_bands is None:
+            desired_bands = list(self.bands[self.spatial_resolution])
+        for _key in desired_bands:
+            self.bands[self.spatial_resolution][_key].load_raster()
 
     def free_resources(self) -> None:
         for key, band in self.bands[self.spatial_resolution]:
@@ -96,13 +89,12 @@ class S2Worker:
         It forms a cube of bands.
         @param desired_order: user may set his order
         """
+        stack = []
         if desired_order is None:
             desired_order = list(self.bands[self.spatial_resolution].keys())
-        res_x, res_y = s2_get_resolution(self.spatial_resolution)
-        result = np.ndarray((len(desired_order), res_x, res_y))
-        for i, key in enumerate(desired_order, 0):
-            result[i] = self.bands[self.spatial_resolution][key].raster()
-        return result
+        for key in desired_order:
+            stack.append(self.bands[self.spatial_resolution][key].raster())
+        return np.array(stack)
 
     def __getitem__(self, item):
         """
