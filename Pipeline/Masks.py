@@ -1,14 +1,14 @@
 """
 Faster calculations with numba
 """
-from numba import jit
+from numba import njit
 import math
 
 
 class S2JIT:
 
     @staticmethod
-    @jit(nopython=True)
+    @njit
     def s2_pixel_analysis(ndvi, data, doys, result, doy, res_x, res_y):
         for y in range(res_y):
             for x in range(res_x):
