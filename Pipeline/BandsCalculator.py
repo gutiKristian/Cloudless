@@ -9,7 +9,7 @@ class BandCalculator:
     #  TODO: Make worker argument optional, to generalize this method
     @staticmethod
     def save_band(raster_img, name: str, worker: S2Worker = None, path: str = None, driver: str = "GTiff",
-                  d_type: gdal.Dataset = gdal.GDT_Float32, geo_transform: gdal.Dataset = None,
+                  d_type: gdal.Dataset = gdal.GDT_UInt16, geo_transform: gdal.Dataset = None,
                   projection: gdal.Dataset = None):
 
         # 2 dimensional array means there's only one raster image to save
