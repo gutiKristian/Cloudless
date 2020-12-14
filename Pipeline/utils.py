@@ -15,6 +15,16 @@ def s2_is_spatial_correct(resolution: int) -> bool:
     return resolution in [10, 20, 60]
 
 
+def s2_is_safe_format(name: str) -> bool:
+    """
+    Checks whether the dataset is in sentinel 2 safe format.
+    Actually checks if the name of the folder hasn't been modified.
+    :param name: file name
+    :return: true/false
+    """
+    return name.split(".")[-1] == "SAFE"
+
+
 def get_subdirectories(path: str) -> List[str]:
     return [el.path for el in os.scandir(path) if el.is_dir()]
 
