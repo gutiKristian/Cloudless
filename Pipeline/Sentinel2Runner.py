@@ -63,7 +63,7 @@ class S2Runner:
             threads.append(t)
         for t in threads:
             t.join()
-            print("done-opening")
+            print("Raster images loaded")
 
     def run_ndvi_cloud_masking(self) -> int:
         """
@@ -85,13 +85,13 @@ class S2Runner:
             del mask
         print(Back.LIGHTGREEN_EX + "DONE MASKING !")
         start = time.time()
-        self._s2_jit_pixel_analysis()
+        self._s2_jit_ndvi_pixel_analysis()
         end = time.time()
         print(Back.LIGHTGREEN_EX + "Elapsed time - masking = %s" % (end - start))
         self._save_result()
         return 0
 
-    def _s2_jit_pixel_analysis(self):
+    def _s2_jit_ndvi_pixel_analysis(self):
         # Prepare the data
         result_bands = ["B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B11", "B12", "AOT"]
         res_x, res_y = s2_get_resolution(self.spatial_resolution)
@@ -103,7 +103,7 @@ class S2Runner:
         print(Back.LIGHTGREEN_EX + "Elapsed time - opening datasets = %s" % (end - start))
 
         doys = np.array([w.doy for w in self.workers])
-        ndvi = LIST()
+        ndvi = LIST()  # NDVI's are scattered across worker temps
         data_bands = LIST()
         start = time.time()
         for i, worker in enumerate(self.workers, 0):
@@ -116,7 +116,7 @@ class S2Runner:
         doy = np.zeros(shape=(res_x, res_y), dtype=np.uint16)
 
         start = time.time()
-        S2JIT.s2_pixel_analysis(ndvi, data_bands, doys, result, doy, res_x, res_y)
+        S2JIT.s2_ndvi_pixel_analysis(ndvi, data_bands, doys, result, doy, res_x, res_y)
         end = time.time()
         print(Back.LIGHTGREEN_EX + "Elapsed time - masking = %s" % (end - start))
 
