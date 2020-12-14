@@ -1,2 +1,2 @@
-# sentinel-pipepline
+# sentinel-pipeline
 
