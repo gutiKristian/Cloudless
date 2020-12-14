@@ -3,7 +3,7 @@ from xml.etree import ElementTree  # xml
 from osgeo import gdal
 from Pipeline.PipelineBand import *
 from Pipeline.utils import *
-
+from colorama import Back
 gdal.UseExceptions()
 
 
@@ -14,7 +14,7 @@ class S2Worker:
 
     def __init__(self, path: str, spatial_res: int):
         if not is_dir_valid(path):
-            raise FileNotFoundError('Dataset has not been found !')
+            raise FileNotFoundError(Back.RED + "Dataset has not been found !")
         self.path = path
         self.spatial_resolution = spatial_res
         self.meta_data_path = self.path + os.path.sep + "MTD_MSIL2A.xml"
