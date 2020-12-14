@@ -33,7 +33,7 @@ class S2Worker:
         self.temp = {}
 
     def _find_images(self):
-        if self.meta_data is None:
+        if self.meta_data_gdal is None:
             return get_files_in_directory(self.path)
         tree = ElementTree.parse(self.meta_data_path)
         root = tree.getroot()
