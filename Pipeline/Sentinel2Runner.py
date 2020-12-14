@@ -2,8 +2,9 @@ import threading
 import time
 import shutil
 
-from numba.typed import List as LIST
 
+from numba.typed import List as LIST
+from colorama import Back
 from Pipeline.WorkerCalculator import *
 from Pipeline.Masks import *
 from Pipeline.Plotting import *
@@ -28,6 +29,9 @@ class S2Runner:
         #  The result of masking is stored in this variable
         self.result = {}
         self.save_result_path = self.main_dataset_path + "/result"
+
+    def get_save_path(self):
+        return self.save_result_path
 
     def _validate_files_by_mercator(self) -> None:
         if len(self.datasets) < 2:
@@ -69,7 +73,7 @@ class S2Runner:
         4. Do the masking
         :return: code 0 for success, results will be saved in the workers path and final directory
         """
-        print("start masking")
+        print(Back.LIGHTGREEN_EX + "Starting Masking")
         for worker in self.workers:
             WorkerCalculator.s2_ndvi(worker)
             mask = (worker["B02"] > 100) & (worker["B04"] > 100) & (worker["B8A"] > 500) & \
@@ -79,11 +83,11 @@ class S2Runner:
             worker.temp["NDVI"] = np.ma.array(worker.temp["NDVI"], mask=mask, fill_value=0).filled()
             Plot.plot_image(worker.temp["NDVI"])
             del mask
-        print("done")
+        print(Back.LIGHTGREEN_EX + "DONE MASKING !")
         start = time.time()
         self._s2_jit_pixel_analysis()
         end = time.time()
-        print("Elapsed time - masking = %s" % (end - start))
+        print(Back.LIGHTGREEN_EX + "Elapsed time - masking = %s" % (end - start))
         self._save_result()
         return 0
 
@@ -96,7 +100,7 @@ class S2Runner:
         start = time.time()
         self._load_bands(result_bands)
         end = time.time()
-        print("Elapsed time - opening datasets = %s" % (end - start))
+        print(Back.LIGHTGREEN_EX + "Elapsed time - opening datasets = %s" % (end - start))
 
         doys = np.array([w.doy for w in self.workers])
         ndvi = LIST()
@@ -106,7 +110,7 @@ class S2Runner:
             ndvi.append(worker.temp["NDVI"])
             data_bands.append(worker.stack_bands(result_bands))
         end = time.time()
-        print("Elapsed time - stacking= %s" % (end - start))
+        print(Back.LIGHTGREEN_EX + "Elapsed time - stacking= %s" % (end - start))
 
         result = np.zeros(shape=(len(result_bands), res_x, res_y), dtype=np.uint16)
         doy = np.zeros(shape=(res_x, res_y), dtype=np.uint16)
@@ -114,7 +118,7 @@ class S2Runner:
         start = time.time()
         S2JIT.s2_pixel_analysis(ndvi, data_bands, doys, result, doy, res_x, res_y)
         end = time.time()
-        print("Elapsed time - masking = %s" % (end - start))
+        print(Back.LIGHTGREEN_EX + "Elapsed time - masking = %s" % (end - start))
 
         # Init
         for i, band in enumerate(result_bands, 0):
