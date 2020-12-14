@@ -1,5 +1,6 @@
 import threading
 import time
+import shutil
 
 from numba.typed import List as LIST
 
@@ -23,7 +24,7 @@ class S2Runner:
         self.datasets = get_subdirectories(path)
         self._validate_files_by_mercator()
         # Initialize workers
-        self.workers = [S2Worker(_path, spatial_resolution) for _path in self.datasets]
+        self.workers = [S2Worker(_path, spatial_resolution) for _path in self.datasets if s2_is_safe_format(_path)]
         #  The result of masking is stored in this variable
         self.result = {}
         self.save_result_path = self.main_dataset_path + "/result"
@@ -38,14 +39,17 @@ class S2Runner:
                 raise Exception("Tiles with different area detected")
 
     def _save_result(self) -> None:
-        os.mkdir(self.save_result_path)
-        # TODO : Fix setting projections and geo-transforms
-        # projection = list(self.workers[-1].bands.values())[0].projection
-        # geo_transform = list(self.workers[-1].bands.values())[0].geo_transform
+        try:
+            os.mkdir(self.save_result_path)
+        except FileExistsError:
+            shutil.rmtree(self.save_result_path)
+            os.mkdir(self.save_result_path)
+        projection = list(self.workers[-1].bands[self.spatial_resolution].values())[0].projection
+        geo_transform = list(self.workers[-1].bands[self.spatial_resolution].values())[0].geo_transform
         for key in self.result.keys():
             path = self.save_result_path + "/" + key + "_" + str(self.spatial_resolution)
-            BandCalculator.save_band(raster_img=self.result[key], name=key + "_" + str(self.spatial_resolution),
-                                     path=path)
+            WorkerCalculator.save_band(raster_img=self.result[key], name=key + "_" + str(self.spatial_resolution),
+                                       path=path, projection=projection, geo_transform=geo_transform)
 
     def _load_bands(self, desired_bands: List[str] = None):
         threads = []
@@ -67,7 +71,7 @@ class S2Runner:
         """
         print("start masking")
         for worker in self.workers:
-            BandCalculator.s2_ndvi(worker)
+            WorkerCalculator.s2_ndvi(worker)
             mask = (worker["B02"] > 100) & (worker["B04"] > 100) & (worker["B8A"] > 500) & \
                    (worker["B8A"] < 8000) & (worker["AOT"] < 100)
             Plot.plot_mask(mask)
