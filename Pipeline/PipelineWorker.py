@@ -14,23 +14,27 @@ class S2Worker:
 
     def __init__(self, path: str, spatial_res: int):
         if not is_dir_valid(path):
-            raise FileNotFoundError('Data set has not been found !')
+            raise FileNotFoundError('Dataset has not been found !')
         self.path = path
         self.spatial_resolution = spatial_res
         self.meta_data_path = self.path + os.path.sep + "MTD_MSIL2A.xml"
         try:
             self.meta_data_gdal = gdal.Open(self.meta_data_path)
+            self.meta_data = self.meta_data_gdal.GetMetadata()
+            self.data_take = datetime.strptime(self.meta_data["DATATAKE_1_DATATAKE_SENSING_START"],
+                                               "%Y-%m-%dT%H:%M:%S.%fZ")
+            self.doy = self.data_take.timetuple().tm_yday
         except Exception as e:
-            print('Opening meta data file raised an exception')
-            raise e
-        self.meta_data = self.meta_data_gdal.GetMetadata()
+            print('Opening meta data file raised an exception', e, "\nWorker continues without metadata file!")
         self.paths_to_raster = self._find_images()
+        if self.paths_to_raster is None or len(self.paths_to_raster) < 2:
+            raise Exception("None or not enough datasets have been provided!")
         self.bands = self._to_band_dictionary()
         self.temp = {}
-        self.data_take = datetime.strptime(self.meta_data["DATATAKE_1_DATATAKE_SENSING_START"], "%Y-%m-%dT%H:%M:%S.%fZ")
-        self.doy = self.data_take.timetuple().tm_yday
 
     def _find_images(self):
+        if self.meta_data is None:
+            return get_files_in_directory(self.path)
         tree = ElementTree.parse(self.meta_data_path)
         root = tree.getroot()
         images = []
