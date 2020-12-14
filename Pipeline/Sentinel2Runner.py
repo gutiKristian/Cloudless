@@ -68,13 +68,13 @@ class S2Runner:
         print("start masking")
         for worker in self.workers:
             BandCalculator.s2_ndvi(worker)
-            # mask = (worker["B02"] > 100) & (worker["B04"] > 100) & (worker["B8A"] > 500) & \
-            #        (worker["B8A"] < 8000) & (worker["AOT"] < 100)
-            # Plot.plot_mask(mask)
+            mask = (worker["B02"] > 100) & (worker["B04"] > 100) & (worker["B8A"] > 500) & \
+                   (worker["B8A"] < 8000) & (worker["AOT"] < 100)
+            Plot.plot_mask(mask)
             Plot.plot_image(worker.temp["NDVI"])
-            # worker.temp["NDVI"] = np.ma.array(worker.temp["NDVI"], mask=~mask, fill_value=0).filled()
-            # Plot.plot_image(worker.temp["NDVI"])
-            # del mask
+            worker.temp["NDVI"] = np.ma.array(worker.temp["NDVI"], mask=mask, fill_value=0).filled()
+            Plot.plot_image(worker.temp["NDVI"])
+            del mask
         print("done")
         start = time.time()
         self._s2_jit_pixel_analysis()
