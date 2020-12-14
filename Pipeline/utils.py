@@ -11,12 +11,16 @@ def is_file_valid(path: str) -> bool:
     return os.path.isfile(path)
 
 
-def sentinel2_is_spatial_correct(resolution: int) -> bool:
+def s2_is_spatial_correct(resolution: int) -> bool:
     return resolution in [10, 20, 60]
 
 
 def get_subdirectories(path: str) -> List[str]:
     return [el.path for el in os.scandir(path) if el.is_dir()]
+
+
+def get_files_in_directory(path: str) -> List[str]:
+    return [file for file in os.listdir(path) if is_file_valid(file)]
 
 
 def extract_mercator(path: str) -> str:
@@ -27,7 +31,7 @@ def extract_mercator(path: str) -> str:
 
 
 def s2_get_resolution(spatial):
-    if not sentinel2_is_spatial_correct(spatial):
+    if not s2_is_spatial_correct(spatial):
         raise Exception("This spatial resolution does not exist in the sentinel 2 context")
     if spatial == 10:
         return 10980, 10980
