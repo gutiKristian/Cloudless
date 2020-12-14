@@ -4,7 +4,7 @@ from Pipeline.PipelineWorker import *
 from osgeo import gdal
 
 
-class BandCalculator:
+class WorkerCalculator:
 
     #  TODO: Make worker argument optional, to generalize this method
     @staticmethod
@@ -84,12 +84,12 @@ class BandCalculator:
     def s2_ndvi(worker: S2Worker, save: bool = False):
         nir = worker['B8A'].raster().astype(float)
         red = worker['B04'].raster().astype(float)
-        ndvi = BandCalculator.ndvi(red, nir)
+        ndvi = WorkerCalculator.ndvi(red, nir)
         worker.temp["NDVI"] = ndvi
         if not save:
             return ndvi
-        BandCalculator.save_band(worker, ndvi, "NDVI", geo_transform=worker['B04'].geotransform,
-                                 projection=worker['B04'].projection)
+        WorkerCalculator.save_band(worker, ndvi, "NDVI", geo_transform=worker['B04'].geotransform,
+                                   projection=worker['B04'].projection)
         del nir, red
         return ndvi
 
