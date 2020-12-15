@@ -31,7 +31,8 @@ class S2JIT:
                         _max_val = ndvi[i][y, x]
                         index = i
                 doy[y, x] = doys[index]
+                result[:, y, x] = data[index][:, y, x]  # TODO: TEST
                 #  Access worker bands, j - band index
-                for j in range(len(data[index])):
-                    result[j, y, x] = data[index][j, y, x]  # TODO: check this result[:, y, x] = data[index][:, y, x]
-        return result, doy                                  # TODO : no loop needed
+                # for j in range(len(data[index])):
+                #     result[j, y, x] = data[index][j, y, x]
+        return result, doy
