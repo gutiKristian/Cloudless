@@ -7,10 +7,11 @@ gdal.UseExceptions()
 
 
 class Band:
-    def __init__(self, path: str, load_on_init: bool = False):
+    def __init__(self, path: str, load_on_init: bool = False, slice_index: int = 1):
         if not is_file_valid(path):
             raise FileNotFoundError("Raster does not exist!")
         self.path = path
+        self.slice_index = slice_index
         self._gdal = None
         self.raster_image = None
         self.geo_transform = None
@@ -39,6 +40,7 @@ class Band:
             self.init_gdal()
         self._was_raster_read = True
         self.raster_image = self._gdal.GetRasterBand(1).ReadAsArray()
+        slice_raster(self.slice_index, self.raster_image)
 
     def raster(self) -> np.array:
         if self._was_raster_read:

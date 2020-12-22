@@ -10,11 +10,14 @@ from Pipeline.Plotting import *
 
 
 class S2Runner:
-    def __init__(self, path: str, spatial_resolution: int):
+    def __init__(self, path: str, spatial_resolution: int, slice_index: int = 1):
         if not is_dir_valid(path):
             raise FileNotFoundError("{} may not exist\nPlease check if file exists".format(path))
         if not s2_is_spatial_correct(spatial_resolution):
             raise Exception("Wrong spatial resolution, please choose between 10, 20 and 60m")
+        if s2_get_resolution(spatial_resolution)[0] % slice_index != 0:
+            raise Exception("Unable to evenly slice the image! Please use different value, the working resolution is "
+                            "{0} and slicing index is {1}")
         #  Path to directory that represents one big tile for instance T33UXW
         self.main_dataset_path = path
         #  Supported spatial resolutions for sentinel 2 are 10m,20m and 60m

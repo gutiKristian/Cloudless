@@ -12,7 +12,7 @@ class S2Worker:
     This class can be instantiated only inside S2Runner.
     """
 
-    def __init__(self, path: str, spatial_res: int):
+    def __init__(self, path: str, spatial_res: int, slice_index: int = 1):
         if not is_dir_valid(path):
             raise FileNotFoundError(Back.RED + "Dataset has not been found !")
         self.path = path
@@ -26,7 +26,9 @@ class S2Worker:
         self.__find_images()
         if self.paths_to_raster is None or len(self.paths_to_raster) < 2:
             raise Exception("None or not enough datasets have been provided!")
+        self.slice_index = slice_index
         self.bands = self.__to_band_dictionary()
+        self.cloud_index = 0
         self.temp = {}
 
     def __find_images(self):
@@ -59,7 +61,7 @@ class S2Worker:
             e_dict[self.spatial_resolution] = {}
         for band in self.paths_to_raster:
             key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', band)[-1]
-            e_dict[self.spatial_resolution][key] = Band(band)
+            e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
         return e_dict
 
     def __initialize_meta(self):
