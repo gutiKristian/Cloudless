@@ -27,7 +27,7 @@ class S2Runner:
         self.datasets = get_subdirectories(path)
         self._validate_files_by_mercator()
         # Initialize workers
-        self.workers = [S2Worker(_path, spatial_resolution) for _path in self.datasets if s2_is_safe_format(_path)]
+        self.workers = [S2Worker(_path, spatial_resolution, slice_index) for _path in self.datasets if s2_is_safe_format(_path)]
         #  The result of masking is stored in this variable
         self.result = {}
         self.save_result_path = self.main_dataset_path + os.pathsep + "result"
