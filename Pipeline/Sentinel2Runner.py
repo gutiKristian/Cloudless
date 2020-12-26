@@ -59,16 +59,13 @@ class S2Runner:
                                        path=path, projection=projection, geo_transform=geo_transform)
 
     def _load_bands(self, desired_bands: List[str] = None):
-        threads = []
         for worker in self.workers:
-            t = threading.Thread(target=worker.load_bands, args=[desired_bands])
-            t.start()
-            threads.append(t)
-        for t in threads:
-            t.join()
-            print("Raster images loaded")
+            worker.load_bands(desired_bands)
 
     def _release_bands(self):
+        """
+        Free the memory. Set the references for the numpy arrays to None.
+        """
         for worker in self.workers:
             worker.free_resources()
         self.result = {}
@@ -92,6 +89,7 @@ class S2Runner:
             Plot.plot_image(worker.temp["NDVI"])
             del mask
         print(Back.RED + "DONE MASKING !")
+
         start = time.time()
         self._s2_jit_ndvi_pixel_analysis()
         end = time.time()
