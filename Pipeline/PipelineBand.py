@@ -40,7 +40,8 @@ class Band:
             self.init_gdal()
         self._was_raster_read = True
         self.raster_image = self._gdal.GetRasterBand(1).ReadAsArray()
-        slice_raster(self.slice_index, self.raster_image)
+        if self.slice_index > 1:
+            slice_raster(self.slice_index, self.raster_image)
 
     def raster(self) -> np.array:
         if self._was_raster_read:
