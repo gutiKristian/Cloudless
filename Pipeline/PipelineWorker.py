@@ -4,6 +4,7 @@ from osgeo import gdal
 from Pipeline.PipelineBand import *
 from Pipeline.utils import *
 from colorama import Back
+
 gdal.UseExceptions()
 
 
@@ -85,6 +86,11 @@ class S2Worker:
         pass  # TODO: RESAMPLE AND UPDATE THE DICT
 
     def load_bands(self, desired_bands: List[str] = None):
+        """
+        Method for loading the raster data into memory. Exists to avoid loading at the
+        instantiation.
+        :param desired_bands: user might specify which bands should be loaded
+        """
         if desired_bands is None:
             desired_bands = list(self.bands[self.spatial_resolution])
         for _key in desired_bands:
@@ -95,6 +101,11 @@ class S2Worker:
             band.free_resources()
 
     def update_worker(self, name: str, path: str):
+        """
+        Register new file in worker.
+        :param name: represents the file in the worker class
+        :param path: file
+        """
         self.bands[self.spatial_resolution][name] = Band(path)
 
     def stack_bands(self, desired_order: List[str] = None) -> np.ndarray:
