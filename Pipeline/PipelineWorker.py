@@ -4,6 +4,7 @@ from osgeo import gdal
 from Pipeline.PipelineBand import *
 from Pipeline.utils import *
 from colorama import Back
+
 gdal.UseExceptions()
 
 
@@ -12,29 +13,28 @@ class S2Worker:
     This class can be instantiated only inside S2Runner.
     """
 
-    def __init__(self, path: str, spatial_res: int):
+    def __init__(self, path: str, spatial_res: int, slice_index: int = 1):
         if not is_dir_valid(path):
             raise FileNotFoundError(Back.RED + "Dataset has not been found !")
         self.path = path
         self.spatial_resolution = spatial_res
         self.meta_data_path = self.path + os.path.sep + "MTD_MSIL2A.xml"
-        try:
-            self.meta_data_gdal = gdal.Open(self.meta_data_path)
-            self.meta_data = self.meta_data_gdal.GetMetadata()
-            self.data_take = datetime.strptime(self.meta_data["DATATAKE_1_DATATAKE_SENSING_START"],
-                                               "%Y-%m-%dT%H:%M:%S.%fZ")
-            self.doy = self.data_take.timetuple().tm_yday
-        except Exception as e:
-            print('Opening meta data file raised an exception', e, "\nWorker continues without metadata file!")
-        self.paths_to_raster = self._find_images()
+        self.meta_data_gdal = None
+        self.meta_data = None
+        self.data_take = None
+        self.doy = None
+        self.__initialize_meta()
+        self.__find_images()
         if self.paths_to_raster is None or len(self.paths_to_raster) < 2:
             raise Exception("None or not enough datasets have been provided!")
-        self.bands = self._to_band_dictionary()
+        self.slice_index = slice_index
+        self.bands = self.__to_band_dictionary()
+        self.cloud_index = 0
         self.temp = {}
 
-    def _find_images(self):
+    def __find_images(self):
         if self.meta_data_gdal is None:
-            return get_files_in_directory(self.path)
+            self.paths_to_raster = get_files_in_directory(self.path)
         tree = ElementTree.parse(self.meta_data_path)
         root = tree.getroot()
         images = []
@@ -44,12 +44,13 @@ class S2Worker:
                 text = text.replace('/', '\\')
             images.append(self.path + os.sep + text + '.jp2')
         if self.spatial_resolution == 10:
-            return images[0:7]
+            self.paths_to_raster = images[0:7]
         elif self.spatial_resolution == 20:
-            return images[7:20]
-        return images[20::]
+            self.paths_to_raster = images[7:20]
+        else:
+            self.paths_to_raster = images[20::]
 
-    def _to_band_dictionary(self) -> dict:
+    def __to_band_dictionary(self) -> dict:
         """
         Match list of paths of bands to dictionary for better access.
         """
@@ -61,8 +62,18 @@ class S2Worker:
             e_dict[self.spatial_resolution] = {}
         for band in self.paths_to_raster:
             key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', band)[-1]
-            e_dict[self.spatial_resolution][key] = Band(band)
+            e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
         return e_dict
+
+    def __initialize_meta(self):
+        try:
+            self.meta_data_gdal = gdal.Open(self.meta_data_path)
+            self.meta_data = self.meta_data_gdal.GetMetadata()
+            self.data_take = datetime.strptime(self.meta_data["DATATAKE_1_DATATAKE_SENSING_START"],
+                                               "%Y-%m-%dT%H:%M:%S.%fZ")
+            self.doy = self.data_take.timetuple().tm_yday
+        except Exception as e:
+            print('Opening meta data file raised an exception', e, "\nWorker continues without metadata file!")
 
     def get_image_resolution(self) -> Tuple[int, int]:
         if self.spatial_resolution == 10:
@@ -75,16 +86,26 @@ class S2Worker:
         pass  # TODO: RESAMPLE AND UPDATE THE DICT
 
     def load_bands(self, desired_bands: List[str] = None):
+        """
+        Method for loading the raster data into memory. Exists to avoid loading at the
+        instantiation.
+        :param desired_bands: user might specify which bands should be loaded
+        """
         if desired_bands is None:
             desired_bands = list(self.bands[self.spatial_resolution])
         for _key in desired_bands:
             self.bands[self.spatial_resolution][_key].load_raster()
 
     def free_resources(self) -> None:
-        for key, band in self.bands[self.spatial_resolution]:
+        for band in self.bands[self.spatial_resolution].values():
             band.free_resources()
 
     def update_worker(self, name: str, path: str):
+        """
+        Register new file in worker.
+        :param name: represents the file in the worker class
+        :param path: file
+        """
         self.bands[self.spatial_resolution][name] = Band(path)
 
     def stack_bands(self, desired_order: List[str] = None) -> np.ndarray:

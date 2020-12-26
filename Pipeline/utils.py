@@ -1,5 +1,6 @@
 import os
 import re
+import numpy
 from typing import *
 
 
@@ -57,3 +58,13 @@ def look_up_raster(node, element):
             return item
         item = look_up_raster(child, element)
     return item
+
+
+def slice_raster(index: int, image: numpy.ndarray) -> None:
+    """
+    Modifies the image, in-situ function.
+    :param index - slicing index
+    :param image - reference to the base image
+    :return: sliced image
+    """
+    pass

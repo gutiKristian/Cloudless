@@ -2,7 +2,6 @@ import threading
 import time
 import shutil
 
-
 from numba.typed import List as LIST
 from colorama import Back
 from Pipeline.WorkerCalculator import *
@@ -11,11 +10,14 @@ from Pipeline.Plotting import *
 
 
 class S2Runner:
-    def __init__(self, path: str, spatial_resolution: int):
+    def __init__(self, path: str, spatial_resolution: int, slice_index: int = 1):
         if not is_dir_valid(path):
             raise FileNotFoundError("{} may not exist\nPlease check if file exists".format(path))
         if not s2_is_spatial_correct(spatial_resolution):
             raise Exception("Wrong spatial resolution, please choose between 10, 20 and 60m")
+        if s2_get_resolution(spatial_resolution)[0] % slice_index != 0:
+            raise Exception("Unable to evenly slice the image! Please use different value, the working resolution is "
+                            "{0} and slicing index is {1}")
         #  Path to directory that represents one big tile for instance T33UXW
         self.main_dataset_path = path
         #  Supported spatial resolutions for sentinel 2 are 10m,20m and 60m
@@ -25,10 +27,11 @@ class S2Runner:
         self.datasets = get_subdirectories(path)
         self._validate_files_by_mercator()
         # Initialize workers
-        self.workers = [S2Worker(_path, spatial_resolution) for _path in self.datasets if s2_is_safe_format(_path)]
+        self.workers = [S2Worker(_path, spatial_resolution, slice_index) for _path in self.datasets if s2_is_safe_format(_path)]
         #  The result of masking is stored in this variable
         self.result = {}
-        self.save_result_path = self.main_dataset_path + "/result"
+        self.save_result_path = self.main_dataset_path + os.path.sep + "result"
+        self.result_worker = None
 
     def get_save_path(self):
         return self.save_result_path
@@ -56,14 +59,16 @@ class S2Runner:
                                        path=path, projection=projection, geo_transform=geo_transform)
 
     def _load_bands(self, desired_bands: List[str] = None):
-        threads = []
         for worker in self.workers:
-            t = threading.Thread(target=worker.load_bands, args=[desired_bands])
-            t.start()
-            threads.append(t)
-        for t in threads:
-            t.join()
-            print("done-opening")
+            worker.load_bands(desired_bands)
+
+    def _release_bands(self):
+        """
+        Free the memory. Set the references for the numpy arrays to None.
+        """
+        for worker in self.workers:
+            worker.free_resources()
+        self.result = {}
 
     def run_ndvi_cloud_masking(self) -> int:
         """
@@ -83,15 +88,19 @@ class S2Runner:
             worker.temp["NDVI"] = np.ma.array(worker.temp["NDVI"], mask=mask, fill_value=0).filled()
             Plot.plot_image(worker.temp["NDVI"])
             del mask
-        print(Back.LIGHTGREEN_EX + "DONE MASKING !")
+        print(Back.RED + "DONE MASKING !")
+
         start = time.time()
-        self._s2_jit_pixel_analysis()
+        self._s2_jit_ndvi_pixel_analysis()
         end = time.time()
-        print(Back.LIGHTGREEN_EX + "Elapsed time - masking = %s" % (end - start))
-        self._save_result()
+        print(Back.RED + "Elapsed time - masking = %s" % (end - start))
+        self._save_result()  # Save result into files
+        self._release_bands()  # Free resources, also deletes the result
+        # If there's an intention to work further with the files
+        self.result_worker = S2Worker(self.save_result_path, self.spatial_resolution)
         return 0
 
-    def _s2_jit_pixel_analysis(self):
+    def _s2_jit_ndvi_pixel_analysis(self):
         # Prepare the data
         result_bands = ["B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B11", "B12", "AOT"]
         res_x, res_y = s2_get_resolution(self.spatial_resolution)
@@ -103,7 +112,7 @@ class S2Runner:
         print(Back.LIGHTGREEN_EX + "Elapsed time - opening datasets = %s" % (end - start))
 
         doys = np.array([w.doy for w in self.workers])
-        ndvi = LIST()
+        ndvi = LIST()  # NDVI's are scattered across worker temps
         data_bands = LIST()
         start = time.time()
         for i, worker in enumerate(self.workers, 0):
@@ -116,7 +125,7 @@ class S2Runner:
         doy = np.zeros(shape=(res_x, res_y), dtype=np.uint16)
 
         start = time.time()
-        S2JIT.s2_pixel_analysis(ndvi, data_bands, doys, result, doy, res_x, res_y)
+        S2JIT.s2_ndvi_pixel_analysis(ndvi, data_bands, doys, result, doy, res_x, res_y)
         end = time.time()
         print(Back.LIGHTGREEN_EX + "Elapsed time - masking = %s" % (end - start))
 
