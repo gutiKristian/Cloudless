@@ -35,6 +35,7 @@ class S2Worker:
     def __find_images(self):
         if self.meta_data_gdal is None:
             self.paths_to_raster = get_files_in_directory(self.path)
+            return
         tree = ElementTree.parse(self.meta_data_path)
         root = tree.getroot()
         images = []
