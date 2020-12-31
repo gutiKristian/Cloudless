@@ -64,6 +64,15 @@ def look_up_raster(node, element):
     return item
 
 
+# --------------- RASTER UTILS ---------------
+
+
+def ndvi(red: numpy.ndarray, nir: numpy.ndarray) -> numpy.ndarray:
+    ndvi1 = (nir - red)
+    ndvi2 = (nir + red)
+    return numpy.divide(ndvi1, ndvi2, out=numpy.zeros_like(ndvi1), where=ndvi2 != 0).squeeze()
+
+
 def slice_raster(index: int, image: numpy.ndarray) -> None:
     """
     Modifies the image, in-situ function.
