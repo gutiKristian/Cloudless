@@ -4,6 +4,8 @@ import numpy
 from typing import *
 
 
+# --------------- FILE UTILS ---------------
+
 def is_dir_valid(path: str) -> bool:
     return os.path.isdir(path)
 
@@ -11,6 +13,16 @@ def is_dir_valid(path: str) -> bool:
 def is_file_valid(path: str) -> bool:
     return os.path.isfile(path)
 
+
+def get_subdirectories(path: str) -> List[str]:
+    return [el.path for el in os.scandir(path) if el.is_dir()]
+
+
+def get_files_in_directory(path: str) -> List[str]:
+    return [file for file in os.listdir(path) if is_file_valid(file)]
+
+
+# --------------- S2WORKER UTILS ---------------
 
 def s2_is_spatial_correct(resolution: int) -> bool:
     return resolution in [10, 20, 60]
@@ -24,14 +36,6 @@ def s2_is_safe_format(name: str) -> bool:
     :return: true/false
     """
     return name.split(".")[-1] == "SAFE"
-
-
-def get_subdirectories(path: str) -> List[str]:
-    return [el.path for el in os.scandir(path) if el.is_dir()]
-
-
-def get_files_in_directory(path: str) -> List[str]:
-    return [file for file in os.listdir(path) if is_file_valid(file)]
 
 
 def extract_mercator(path: str) -> str:
