@@ -70,6 +70,31 @@ class S2Runner:
             worker.free_resources()
         self.result = {}
 
+    def optimised_ndvi(self, constraint=5) -> int:
+        res_x, res_y = s2_get_resolution(self.spatial_resolution)
+        ndvi_stack = np.zeros(shape=(len(self.workers), res_x, res_y))
+        print(Back.LIGHTGREEN_EX + "Starting Masking")
+        for i, worker in enumerate(self.workers, 0):
+            WorkerCalculator.s2_ndvi(worker)
+            mask = (worker["B02"] > 100) & (worker["B04"] > 100) & (worker["B8A"] > 500) & \
+                   (worker["B8A"] < 8000) & (worker["AOT"] < 100)
+            ndvi_stack[i] = np.ma.array(worker.temp["NDVI"], mask=mask, fill_value=0).filled()
+            del mask
+            worker.free_resources()  # only opened bands temp stays
+        w_mask, w_to_use = S2JIT.s2_ndvi_pixel_masking(ndvi_stack)
+        print(Back.RED + "DONE MASKING !")
+        for i in range(len(self.workers)):
+            if w_to_use[i]:
+                pass  # open the dataset
+            if (i == len(self.workers)) or (i != 0 and i % constraint == 0):
+                pass  # run the analysis
+                for j in range(i):
+                    pass  # free opened workers
+
+        # Now open datasets of w_to_use (workers to use) and put it inside final image
+        # may be more than one iteration, depends on RAM constraints
+        # TODO: Do the final masking
+
     def run_ndvi_cloud_masking(self) -> int:
         """
         1. Calculate NDVI for every worker
