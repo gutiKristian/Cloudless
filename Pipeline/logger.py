@@ -1,5 +1,4 @@
 import logging
-from rich.logging import RichHandler
 
 log = logging.getLogger(__name__)
 

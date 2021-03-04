@@ -117,6 +117,7 @@ class S2Runner:
             log.debug(f"Masking {constraint} tiles.")
             S2JIT.s2_ndvi_pixel_analysis(ndvi_arrays, ndvi_result, current_data, current_doy, result, doy, res_x, res_y)
             log.debug(f"Done!")
+            Plot.plot_image(ndvi_result)
             current_data = LIST()  # last iteration, del the pointer to the arrays
 
         # Init
@@ -128,7 +129,7 @@ class S2Runner:
         self._save_result()  # Save result into files
         log.info("Done!")
         # If there's an intention to work further with the files
-        self.result_worker = S2Worker(self.save_result_path, self.spatial_resolution, self.output_bands)
+        # self.result_worker = S2Worker(self.save_result_path, self.spatial_resolution, self.output_bands)
         log.debug("New self.worker attribute initialized.")
         log.info("Masking done!")
         return 0
