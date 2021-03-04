@@ -19,8 +19,12 @@ def get_subdirectories(path: str) -> List[str]:
 
 
 def get_files_in_directory(path: str) -> List[str]:
-    return [file for file in os.listdir(path) if is_file_valid(file)]
-
+    result = []
+    for f in os.listdir(path):
+        f = path + os.path.sep + f
+        if is_file_valid(f):
+            result.append(f)
+    return result
 
 # --------------- S2WORKER UTILS ---------------
 
@@ -62,6 +66,16 @@ def look_up_raster(node, element):
             return item
         item = look_up_raster(child, element)
     return item
+
+
+def bands_for_resolution(spatial_resolution):
+    if not s2_is_spatial_correct(spatial_resolution):
+        raise Exception("Wrong spatial resolution")
+    if spatial_resolution == 20:
+        return ["B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B11", "B12", "AOT"]
+    elif spatial_resolution == 10:
+        return ["B02", "B03", "B04", "B08", "AOT"]
+    return ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B09", "B11", "B12", "AOT"]  # 60
 
 
 # --------------- RASTER UTILS ---------------

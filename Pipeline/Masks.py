@@ -31,10 +31,11 @@ class S2JIT:
 
     @staticmethod
     @njit
-    def s2_ndvi_pixel_analysis(ndvi, data, doys, result, doy, res_x, res_y):
+    def s2_ndvi_pixel_analysis(ndvi, ndvi_res, data, doys, result, doy, res_x, res_y):
         """
         Per pixel analysis for NDVI masking
         :param ndvi: List[numpy.ndarray] - list of 2D arrays
+        :param ndvi_res: numpy.array - 2D array which holds current maximum value of ndvi for pixel in that position
         :param data: List[numpy.ndarray] - list of 3D arrays, stacked data
         :param doys: numpy.array - 1D array
         :param result: numpy.ndarray - 3D array
@@ -47,14 +48,12 @@ class S2JIT:
             for x in range(res_x):
                 _max_val = -math.inf
                 index = 0
-                # i - worker index, y,x are coords
+                # i - worker index; y,x are coords
                 for i in range(len(data)):
                     if ndvi[i][y, x] > _max_val:
                         _max_val = ndvi[i][y, x]
                         index = i
-                doy[y, x] = doys[index]
-                result[:, y, x] = data[index][:, y, x]  # TODO: TEST
-                #  Access worker bands, j - band index
-                # for j in range(len(data[index])):
-                #     result[j, y, x] = data[index][j, y, x]
+                if ndvi_res[y, x] <= ndvi[index][y, x]:
+                    doy[y, x] = doys[index]
+                    result[:, y, x] = data[index][:, y, x]
         return result, doy
