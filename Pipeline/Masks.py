@@ -54,6 +54,7 @@ class S2JIT:
                         _max_val = ndvi[i][y, x]
                         index = i
                 if ndvi_res[y, x] <= ndvi[index][y, x]:
+                    ndvi_res[y, x] = ndvi[index][y, x]
                     doy[y, x] = doys[index]
                     result[:, y, x] = data[index][:, y, x]
         return result, doy
