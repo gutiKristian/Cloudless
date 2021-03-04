@@ -13,16 +13,18 @@ class S2Worker:
     This class can be instantiated only inside S2Runner.
     """
 
-    def __init__(self, path: str, spatial_res: int, slice_index: int = 1):
+    def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1):
         if not is_dir_valid(path):
             raise FileNotFoundError(Back.RED + "Dataset has not been found !")
         self.path = path
         self.spatial_resolution = spatial_res
+        self.desired_bands = desired_bands
         self.meta_data_path = self.path + os.path.sep + "MTD_MSIL2A.xml"
         self.meta_data_gdal = None
         self.meta_data = None
         self.data_take = None
         self.doy = None
+        self.paths_to_raster = None
         self.__initialize_meta()
         self.__find_images()
         if self.paths_to_raster is None or len(self.paths_to_raster) < 2:
@@ -35,6 +37,7 @@ class S2Worker:
     def __find_images(self):
         if self.meta_data_gdal is None:
             self.paths_to_raster = get_files_in_directory(self.path)
+            return
         tree = ElementTree.parse(self.meta_data_path)
         root = tree.getroot()
         images = []
@@ -62,7 +65,8 @@ class S2Worker:
             e_dict[self.spatial_resolution] = {}
         for band in self.paths_to_raster:
             key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', band)[-1]
-            e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
+            if key in self.desired_bands:
+                e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
         return e_dict
 
     def __initialize_meta(self):
@@ -97,6 +101,10 @@ class S2Worker:
             self.bands[self.spatial_resolution][_key].load_raster()
 
     def free_resources(self) -> None:
+        """
+        Release the bands numpy arrays. Not the temp!
+        :return: None
+        """
         for band in self.bands[self.spatial_resolution].values():
             band.free_resources()
 
@@ -119,7 +127,7 @@ class S2Worker:
             desired_order = list(self.bands[self.spatial_resolution].keys())
         for key in desired_order:
             stack.append(self.bands[self.spatial_resolution][key].raster())
-        return np.array(stack)
+        return np.stack(stack)
 
     def __getitem__(self, item):
         """

@@ -4,6 +4,8 @@ import numpy
 from typing import *
 
 
+# --------------- FILE UTILS ---------------
+
 def is_dir_valid(path: str) -> bool:
     return os.path.isdir(path)
 
@@ -11,6 +13,20 @@ def is_dir_valid(path: str) -> bool:
 def is_file_valid(path: str) -> bool:
     return os.path.isfile(path)
 
+
+def get_subdirectories(path: str) -> List[str]:
+    return [el.path for el in os.scandir(path) if el.is_dir()]
+
+
+def get_files_in_directory(path: str) -> List[str]:
+    result = []
+    for f in os.listdir(path):
+        f = path + os.path.sep + f
+        if is_file_valid(f):
+            result.append(f)
+    return result
+
+# --------------- S2WORKER UTILS ---------------
 
 def s2_is_spatial_correct(resolution: int) -> bool:
     return resolution in [10, 20, 60]
@@ -24,14 +40,6 @@ def s2_is_safe_format(name: str) -> bool:
     :return: true/false
     """
     return name.split(".")[-1] == "SAFE"
-
-
-def get_subdirectories(path: str) -> List[str]:
-    return [el.path for el in os.scandir(path) if el.is_dir()]
-
-
-def get_files_in_directory(path: str) -> List[str]:
-    return [file for file in os.listdir(path) if is_file_valid(file)]
 
 
 def extract_mercator(path: str) -> str:
@@ -58,6 +66,25 @@ def look_up_raster(node, element):
             return item
         item = look_up_raster(child, element)
     return item
+
+
+def bands_for_resolution(spatial_resolution):
+    if not s2_is_spatial_correct(spatial_resolution):
+        raise Exception("Wrong spatial resolution")
+    if spatial_resolution == 20:
+        return ["B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B11", "B12", "AOT"]
+    elif spatial_resolution == 10:
+        return ["B02", "B03", "B04", "B08", "AOT"]
+    return ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B09", "B11", "B12", "AOT"]  # 60
+
+
+# --------------- RASTER UTILS ---------------
+
+
+def ndvi(red: numpy.ndarray, nir: numpy.ndarray) -> numpy.ndarray:
+    ndvi1 = (nir - red)
+    ndvi2 = (nir + red)
+    return numpy.divide(ndvi1, ndvi2, out=numpy.zeros_like(ndvi1), where=ndvi2 != 0).squeeze()
 
 
 def slice_raster(index: int, image: numpy.ndarray) -> None:

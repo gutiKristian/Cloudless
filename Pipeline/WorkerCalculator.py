@@ -1,6 +1,5 @@
-import numpy as np
-import os
 from Pipeline.PipelineWorker import *
+from Pipeline.utils import *
 from osgeo import gdal
 
 
@@ -75,23 +74,23 @@ class WorkerCalculator:
         return path  # path where it is saved
 
     @staticmethod
-    def ndvi(red: np.ndarray, nir: np.ndarray):
-        ndvi1 = (nir - red)
-        ndvi2 = (nir + red)
-        return np.divide(ndvi1, ndvi2, out=np.zeros_like(ndvi1), where=ndvi2 != 0).squeeze()
-
-    @staticmethod
     def s2_ndvi(worker: S2Worker, save: bool = False):
+        """
+        Calculates the Normalized difference vegetation index
+        :param worker: worker that provides us data
+        :param save: if user wants to save the result inside the working dir of the worker
+        :return: numpy array
+        """
         nir = worker['B8A'].raster().astype(float)
         red = worker['B04'].raster().astype(float)
-        ndvi = WorkerCalculator.ndvi(red, nir)
-        worker.temp["NDVI"] = ndvi
+        _ndvi = ndvi(red=red, nir=nir)
+        worker.temp["NDVI"] = _ndvi
         if not save:
-            return ndvi
-        WorkerCalculator.save_band(worker, ndvi, "NDVI", geo_transform=worker['B04'].geotransform,
+            return _ndvi
+        WorkerCalculator.save_band(worker, _ndvi, "NDVI", geo_transform=worker['B04'].geotransform,
                                    projection=worker['B04'].projection)
         del nir, red
-        return ndvi
+        return _ndvi
 
     @staticmethod
     def info():
