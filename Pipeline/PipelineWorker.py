@@ -3,7 +3,6 @@ from xml.etree import ElementTree  # xml
 from osgeo import gdal
 from Pipeline.PipelineBand import *
 from Pipeline.utils import *
-from colorama import Back
 from Pipeline.logger import log
 
 gdal.UseExceptions()
@@ -16,7 +15,7 @@ class S2Worker:
 
     def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1):
         if not is_dir_valid(path):
-            raise FileNotFoundError(Back.RED + "Dataset has not been found !")
+            raise FileNotFoundError("Dataset has not been found !")
         self.path = path
         self.spatial_resolution = spatial_res
         self.desired_bands = desired_bands

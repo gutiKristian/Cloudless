@@ -13,7 +13,6 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     install_requires=[
-        "colorama==0.4.4",
         "cycler==0.10.0",
         "kiwisolver==1.3.1",
         "llvmlite==0.35.0",
