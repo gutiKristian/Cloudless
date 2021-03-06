@@ -18,13 +18,17 @@ def get_subdirectories(path: str) -> List[str]:
     return [el.path for el in os.scandir(path) if el.is_dir()]
 
 
-def get_files_in_directory(path: str) -> List[str]:
+def get_files_in_directory(path: str, _type: str = None) -> List[str]:
     result = []
     for f in os.listdir(path):
         f = path + os.path.sep + f
         if is_file_valid(f):
-            result.append(f)
+            if _type and os.path.splitext(f)[1] == _type:
+                result.append(f)
+            elif not _type:
+                result.append(f)
     return result
+
 
 # --------------- S2WORKER UTILS ---------------
 

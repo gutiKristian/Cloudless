@@ -10,7 +10,8 @@ from Pipeline.Plotting import *
 
 
 class S2Runner:
-    def __init__(self, path: str, spatial_resolution: int, slice_index: int = 1, output_bands: str = []):
+
+    def __init__(self, path: str, spatial_resolution: int, slice_index: int = 1, output_bands: List[str] = []):
         """
         :param path: to the dataset
         :param spatial_resolution: on which we are going to operate on

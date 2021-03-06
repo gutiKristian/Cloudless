@@ -4,6 +4,7 @@ from osgeo import gdal
 from Pipeline.PipelineBand import *
 from Pipeline.utils import *
 from colorama import Back
+from Pipeline.logger import log
 
 gdal.UseExceptions()
 
@@ -33,11 +34,14 @@ class S2Worker:
         self.bands = self.__to_band_dictionary()
         self.cloud_index = 0
         self.temp = {}
+        log.info(f"Initialized worker: {self.path}\n{self}")
 
     def __find_images(self):
         if self.meta_data_gdal is None:
-            self.paths_to_raster = get_files_in_directory(self.path)
+            log.debug(f"MTDMSIL2A.xml has not been found in {self.path}")
+            self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
             return
+        log.debug(f"MTDMSIL2A.xml has been found in {self.path}")
         tree = ElementTree.parse(self.meta_data_path)
         root = tree.getroot()
         images = []
@@ -52,11 +56,17 @@ class S2Worker:
             self.paths_to_raster = images[7:20]
         else:
             self.paths_to_raster = images[20::]
+        log.info(f"Paths to datasets:\n {self.paths_to_raster}")
+        if not is_file_valid(self.paths_to_raster[0]):
+            log.info("Path from meta-data file do not exist...\nChecking the directory...")
+            self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
+        log.info(f"Final paths to raster data {self.paths_to_raster}")
 
     def __to_band_dictionary(self) -> dict:
         """
         Match list of paths of bands to dictionary for better access.
         """
+        log.info("Creating bands from raster paths...")
         if not self.paths_to_raster or len(self.paths_to_raster) == 0:
             return {}
         e_dict = dict()  # create new dictionary
@@ -66,7 +76,9 @@ class S2Worker:
         for band in self.paths_to_raster:
             key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', band)[-1]
             if key in self.desired_bands:
+                log.debug(f"Detected key: {key}")
                 e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
+                log.info(f"Band with spatial resolution: {self.spatial_resolution} and key: {key} initialized.")
         return e_dict
 
     def __initialize_meta(self):
@@ -76,8 +88,9 @@ class S2Worker:
             self.data_take = datetime.strptime(self.meta_data["DATATAKE_1_DATATAKE_SENSING_START"],
                                                "%Y-%m-%dT%H:%M:%S.%fZ")
             self.doy = self.data_take.timetuple().tm_yday
+            log.info("Meta data initialized.")
         except Exception as e:
-            print('Opening meta data file raised an exception', e, "\nWorker continues without metadata file!")
+            log.warning('Opening meta data file raised an exception\n', e, "\nWorker continues without metadata file!")
 
     def get_image_resolution(self) -> Tuple[int, int]:
         if self.spatial_resolution == 10:
@@ -137,3 +150,6 @@ class S2Worker:
         :return: instance of a Band class
         """
         return self.bands[self.spatial_resolution][item]
+
+    def __str__(self):
+        return f"Bands: {self.bands}\nDoy: {self.doy}"

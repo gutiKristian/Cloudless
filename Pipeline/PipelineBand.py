@@ -3,7 +3,7 @@ import gc
 from osgeo import gdal
 from Pipeline.utils import *
 import numpy as np
-
+from Pipeline.logger import log
 gdal.UseExceptions()
 
 
@@ -42,6 +42,7 @@ class Band:
         Since the raster images might be quite big,
         we do not want them casually lay in our memory therefore we can choose when we want them.
         """
+        log.info(f"Load raster: {self.path}")
         if self._was_raster_read:
             return
         if not self.is_opened:
@@ -49,6 +50,7 @@ class Band:
         self._was_raster_read = True
         self.raster_image = self._gdal.GetRasterBand(1).ReadAsArray()
         if self.slice_index > 1:
+            log.info(f"Slicing raster with slice index: {self.slice_index}")
             slice_raster(self.slice_index, self.raster_image)
 
     def raster(self) -> np.array:
