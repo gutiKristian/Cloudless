@@ -12,7 +12,6 @@ setup(
     description='Pipeline for creating cloudless pictures from Sentinel-2 images',
     long_description=long_description,
     long_description_content_type="text/markdown",
-    author='Kristian',
     install_requires=[
         "colorama==0.4.4",
         "cycler==0.10.0",
@@ -27,9 +26,7 @@ setup(
         "Shapely==1.7.1",
         "six==1.15.0"
     ],
-    packages=find_namespace_packages(
-        where=['Pipeline', 'Pipeline.*']
-    ),
+    packages=['Pipeline'],
     include_package_data=True,
     python_requires='>=3.7',
 )
