@@ -2,6 +2,7 @@ import os
 import re
 import numpy
 from typing import *
+from Pipeline.logger import log
 
 
 # --------------- FILE UTILS ---------------
@@ -98,4 +99,20 @@ def slice_raster(index: int, image: numpy.ndarray) -> None:
     :param image - reference to the base image
     :return: sliced image
     """
-    pass
+    res_x, res_y = image.shape
+    if res_x % index != 0:
+        raise Exception("Raster slice index is not correct!")
+    return (image.reshape(index, res_y // index, -1, res_x // index)
+            .swapaxes(1, 2)
+            .reshape(-1, res_y // index, res_x // index))
+
+
+def glue_raster(image: numpy.ndarray, res_y: int, res_x: int):
+    """
+    Return an array of shape (res_x, res_y) where
+    """
+    n, old_y, old_x = image.shape
+    if res_x % old_x != 0:
+        raise Exception(f"Cannot glue raster image with shape: ({n},{old_y},{old_x})"
+                        f" to an img with res: ({res_x},{res_y})")
+    return image.reshape(res_y // old_y, -1, old_y, old_x).swapaxes(1, 2).reshape(res_y, res_x)
