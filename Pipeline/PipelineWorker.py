@@ -103,7 +103,7 @@ class S2Worker:
         return 1830, 1830
 
     def add_another_band(self) -> None:
-        pass  # TODO: RESAMPLE AND UPDATE THE DICT
+        pass  # TODO: RESAMPLE AND UPDATE THE DICT AND DESIRED BANDS OR HOWEVER IT IS CALLED NOW
 
     def load_bands(self, desired_bands: List[str] = None):
         """
@@ -137,6 +137,7 @@ class S2Worker:
         Methods stacks all available bands.
         It forms a cube of bands.
         @param desired_order: user may set his order
+        WARNING: if no desired_order is specified, the order is random therefore might cause problems with the masking.
         """
         stack = []
         if desired_order is None:
