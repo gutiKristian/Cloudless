@@ -16,7 +16,7 @@ class S2Runner:
         :param path: to the dataset
         :param spatial_resolution: on which we are going to operate on
         :param slice_index: per-pixel: always 1, per-tile from pre-defined choices
-        :param output_bands: defined by user on the frontend side
+        :param output_bands: bands we work with
         """
         if not is_dir_valid(path):
             raise FileNotFoundError("{} may not exist\nPlease check if file exists".format(path))
@@ -173,7 +173,7 @@ class S2Runner:
         # with least cloud %
         # { worker_index: [slice_indices] }
         workers_to_use = {}
-        for i in range(slice_index):
+        for i in range(slice_index**2):
             winner = cloud_info[:, i].argmin()
             if winner in workers_to_use:
                 workers_to_use[winner].append(i)
@@ -191,12 +191,10 @@ class S2Runner:
                 doy[sl_index] = self.workers[value].doy
                 res[:, sl_index, :, :] = stack[:, sl_index, :, :]
             del stack
-        self.result["DOY"] = doy
-        result = np.zeros(shape=(len(self.output_bands), res_x, res_y))
+        self.result["DOY"] = glue_raster(doy, res_y, res_x)
+        result = np.zeros(shape=(len(self.output_bands), res_x, res_y), dtype=np.uint16)
         for i in range(len(self.output_bands)):
-            r = res[i, :, :, :]
-            glue_raster(r, res_y, res_x)
-            result[i] = r
+            result[i] = glue_raster(res[i, :, :, :], res_y, res_x)  # (25, 1098, 1098) => (5049, 5049)
         # Save it to the result
         for i, band in enumerate(self.output_bands, 0):
             self.result[band] = result[i]
