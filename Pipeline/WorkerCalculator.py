@@ -93,5 +93,17 @@ class WorkerCalculator:
         return _ndvi
 
     @staticmethod
+    def s2_cloud_mask(w: S2Worker) -> np.ndarray:
+        return (w["B02"] > 100) & (w["B04"] > 100) & (w["B8A"] > 500) & (w["B8A"] < 8000) & (w["AOT"] < 100)
+
+    @staticmethod
+    def s2_pertile_cloud_index_mask(worker: S2Worker) -> np.array:
+        arr = WorkerCalculator.s2_cloud_mask(worker)
+        result = np.zeros(shape=worker.slice_index)
+        for i in range(worker.slice_index):
+            result[i] = np.sum(arr[i]) / (arr.shape[1] * arr.shape[2])
+        return result
+
+    @staticmethod
     def info():
         print("Bands calculator supports GeoTiff and Jpeg2000")

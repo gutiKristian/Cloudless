@@ -83,6 +83,30 @@ def bands_for_resolution(spatial_resolution):
     return ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B09", "B11", "B12", "AOT"]  # 60
 
 
+# --------------- BAND UTILS ---------------
+
+def is_supported_slice(index: int):
+    """
+    Slice index: 5 = 20x20km
+                10 = 10x10km
+                15 =  6x6km (exactly 6.6)
+                18 =  5x5km (exactly 5.5)
+    """
+    return index in [5, 10, 15, 18]
+
+
+def find_closest_slice(index: int):
+    current_index = 0
+    arr = [5, 10, 15, 18]
+    _x = 10000
+    for i in range(len(arr)):
+        x = abs(index - arr[i])
+        if x < _x:
+            _x = x
+            current_index = i
+    return arr[current_index]
+
+
 # --------------- RASTER UTILS ---------------
 
 
