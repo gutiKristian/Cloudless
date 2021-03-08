@@ -94,13 +94,17 @@ class WorkerCalculator:
 
     @staticmethod
     def s2_cloud_mask(w: S2Worker) -> np.ndarray:
-        return (w["B02"] > 100) & (w["B04"] > 100) & (w["B8A"] > 500) & (w["B8A"] < 8000) & (w["AOT"] < 100)
+        a = w["SCL"] > 7
+        b = w["SCL"] < 11
+        c = w["SCL"] < 1
+        return (a & b) | c
 
     @staticmethod
     def s2_pertile_cloud_index_mask(worker: S2Worker) -> np.array:
         arr = WorkerCalculator.s2_cloud_mask(worker)
         result = np.zeros(shape=worker.slice_index**2)
         for i in range(worker.slice_index**2):
+            log.info(f"Sum: {np.sum(arr)}")
             result[i] = np.sum(arr[i]) / (arr.shape[1] * arr.shape[2])
             log.info(f"Worker {worker.doy}, slice_index: {i}, cloud % : {result[i] * 100}")
         return result
