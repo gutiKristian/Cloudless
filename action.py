@@ -4,17 +4,18 @@ from Pipeline.utils import *
 from timeit import default_timer as timer
 import gdal
 import numpy as np
+from Pipeline.Plotting import Plot
 
 if __name__ == '__main__':
     start = timer()
     path = "/home/xgutic/dev/mosveg/temp_jobs/KRWyfMs6kW9f4frgu2rY24/data/33UXQ"
-    s2 = Sentinel2Runner.S2Runner(path, 20, 5)
+    s2 = Sentinel2Runner.S2Runner(path, 20, 18)
     s2.per_tile(constraint=4)
     end = timer()
     print(end - start)
-    # set1 = '/home/xgutic/dev/mosveg/temp_jobs/KRWyfMs6kW9f4frgu2rY24/data/33UXQ/S2A_MSIL2A_20210301T100031_N0214_R122_T33UXQ_20210301T115651.SAFE/T33UXQ_20210301T100031_B02_20m.jp2'
-    # set2 = '/home/xgutic/dev/mosveg/temp_jobs/KRWyfMs6kW9f4frgu2rY24/data/33UXQ/result/B02_20.tif'
-    # set3 = '/home/xgutic/dev/mosveg/temp_jobs/KRWyfMs6kW9f4frgu2rY24/data/33UXQ/S2A_MSIL2A_20210226T095031_N0214_R079_T33UXQ_20210226T122801.SAFE/T33UXQ_20210226T095031_B02_20m.jp2'
+    # set1 = '/home/xgutic/dev/mosveg/temp_jobs/KRWyfMs6kW9f4frgu2rY24/data/33UXQ/S2A_MSIL2A_20210301T100031_N0214_R122_T33UXQ_20210301T115651.SAFE/T33UXQ_20210301T100031_B04_20m.jp2'
+    # set2 = '/home/xgutic/dev/mosveg/temp_jobs/KRWyfMs6kW9f4frgu2rY24/data/33UXQ/result/B05_20.tif'
+    # set3 = '/home/xgutic/dev/mosveg/temp_jobs/KRWyfMs6kW9f4frgu2rY24/data/33UXQ/S2A_MSIL2A_20210226T095031_N0214_R079_T33UXQ_20210226T122801.SAFE/T33UXQ_20210226T095031_B04_20m.jp2'
     # s1 = gdal.Open(set1)
     # s2 = gdal.Open(set2)
     # s3 = gdal.Open(set3)

@@ -2,6 +2,7 @@ import os
 import re
 import numpy
 from typing import *
+import rasterio
 from Pipeline.logger import log
 
 
@@ -77,7 +78,7 @@ def bands_for_resolution(spatial_resolution):
     if not s2_is_spatial_correct(spatial_resolution):
         raise Exception("Wrong spatial resolution")
     if spatial_resolution == 20:
-        return ["B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B11", "B12", "AOT"]
+        return ["B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B11", "B12", "AOT", "SCL"]
     elif spatial_resolution == 10:
         return ["B02", "B03", "B04", "B08", "AOT"]
     return ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B09", "B11", "B12", "AOT"]  # 60
@@ -140,3 +141,17 @@ def glue_raster(image: numpy.ndarray, res_y: int, res_x: int):
         raise Exception(f"Cannot glue raster image with shape: ({n},{old_y},{old_x})"
                         f" to an img with res: ({res_x},{res_y})")
     return image.reshape(res_y // old_y, -1, old_y, old_x).swapaxes(1, 2).reshape(res_y, res_x)
+
+
+def mark_file_sentinel2_bands(filepath, band_names, band_wavelengths):
+    if not band_names:
+        band_names = [f"name:B{'0' if i != 8 or i < 10 else ''}{i}" for i in range(13)]
+        band_names[8] += "a"
+    if not band_wavelengths:
+        band_wavelengths = [443, 490, 560, 665, 705, 740, 783, 865, 945, 1375, 1610, 2190]
+
+    with rasterio.open(filepath) as dataset:
+        for band_i in dataset.count:
+            dataset.set_band_description(band_i,
+                                         band_names[band_i - 1] + " wavelength:{}".format(band_wavelengths[band_i - 1]))
+        print("New band descriptions:", dataset.descriptions)
