@@ -58,7 +58,7 @@ class Band:
         self.raster_image = self._gdal.GetRasterBand(1).ReadAsArray()
         if self.slice_index > 1:
             log.info(f"Slicing raster with slice index: {self.slice_index}")
-            slice_raster(self.slice_index, self.raster_image)
+            self.raster_image = slice_raster(self.slice_index, self.raster_image)
             log.info(f"Slicing successful, shape:({self.raster_image.shape})")
 
     def raster(self) -> np.array:

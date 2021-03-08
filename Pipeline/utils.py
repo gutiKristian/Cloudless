@@ -116,7 +116,7 @@ def ndvi(red: numpy.ndarray, nir: numpy.ndarray) -> numpy.ndarray:
     return numpy.divide(ndvi1, ndvi2, out=numpy.zeros_like(ndvi1), where=ndvi2 != 0).squeeze()
 
 
-def slice_raster(index: int, image: numpy.ndarray) -> None:
+def slice_raster(index: int, image: numpy.ndarray) -> numpy.ndarray:
     """
     Modifies the image, in-situ function.
     :param index - slicing index

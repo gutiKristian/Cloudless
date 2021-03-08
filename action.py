@@ -8,8 +8,8 @@ import numpy as np
 if __name__ == '__main__':
     start = timer()
     path = "/home/xgutic/dev/mosveg/temp_jobs/KRWyfMs6kW9f4frgu2rY24/data/33UXQ"
-    s2 = Sentinel2Runner.S2Runner(path, 20)
-    s2.optimized_ndvi(constraint=4)
+    s2 = Sentinel2Runner.S2Runner(path, 20, 5)
+    s2.per_tile(constraint=4)
     end = timer()
     print(end - start)
     # set1 = '/home/xgutic/dev/mosveg/temp_jobs/KRWyfMs6kW9f4frgu2rY24/data/33UXQ/S2A_MSIL2A_20210301T100031_N0214_R122_T33UXQ_20210301T115651.SAFE/T33UXQ_20210301T100031_B02_20m.jp2'

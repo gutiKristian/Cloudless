@@ -111,10 +111,9 @@ class S2Runner:
                 w.load_bands()
                 WorkerCalculator.s2_ndvi(w)
                 # TODO: take mask as function (like per-tile)
-                # mask = (w["B02"] > 100) & (w["B04"] > 100) & (w["B8A"] > 500) & (w["B8A"] < 8000) & (w["AOT"] < 100)
-                # ndvi_arrays[i] = np.ma.array(w.temp["NDVI"], mask=mask, fill_value=0).filled()
-                ndvi_arrays[i] = w.temp["NDVI"]
-                # del mask
+                mask = (w["B02"] > 100) & (w["B04"] > 100) & (w["B8A"] > 500) & (w["B8A"] < 8000) & (w["AOT"] < 100)
+                ndvi_arrays[i] = np.ma.array(w.temp["NDVI"], mask=mask, fill_value=0).filled()
+                del mask
                 current_data.append(w.stack_bands(self.output_bands))
                 w.free_resources()  # We have copied the resources to the new numpy array inside current_data
             S2JIT.s2_ndvi_pixel_analysis(ndvi_arrays, ndvi_result, current_data, current_doy, result, doy, res_x, res_y)
@@ -152,15 +151,15 @@ class S2Runner:
                 raise Exception("Terminating job. Workers with different slice index are not allowed!")
 
         # slice_raster(slice_index, res)  # For easier assignments
-        doy = np.zeros(shape=(res_x, res_y), dtype=np.uint16)  # our classic
-        slice_raster(slice_index, doy)
+        doy = slice_raster(slice_index, np.zeros(shape=(res_x, res_y), dtype=np.uint16))
+        log.warning(doy.size)
         # Result array, where we are going to store the result intensities of pixel
         # shape -> bands, slices, x, y
         res = np.zeros(shape=(len(self.output_bands), doy.shape[0], doy.shape[1], doy.shape[2]), dtype=np.uint16)
         log.info(f"Initialized result array shape: {len(self.output_bands), doy.shape[0], doy.shape[1], doy.shape[2]}")
         log.info(f"{(len(self.workers) - 1) // constraint + 1} iteration(s) expected!")
         # using numpy for slicing features, could've been simple python 2D list as well
-        cloud_info = np.zeros(shape=(len(self.workers), slice_index))
+        cloud_info = np.zeros(shape=(len(self.workers), slice_index * slice_index))
         # We will do the same as for the ndvi masking, go with iterations to save RAM
         for iteration in range((len(self.workers) - 1) // constraint + 1):
             workers = self.workers[iteration * constraint: (iteration + 1) * constraint]

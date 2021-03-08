@@ -99,9 +99,10 @@ class WorkerCalculator:
     @staticmethod
     def s2_pertile_cloud_index_mask(worker: S2Worker) -> np.array:
         arr = WorkerCalculator.s2_cloud_mask(worker)
-        result = np.zeros(shape=worker.slice_index)
-        for i in range(worker.slice_index):
+        result = np.zeros(shape=worker.slice_index**2)
+        for i in range(worker.slice_index**2):
             result[i] = np.sum(arr[i]) / (arr.shape[1] * arr.shape[2])
+            log.info(f"Worker {worker.doy}, slice_index: {i}, cloud % : {result[i] * 100}")
         return result
 
     @staticmethod
