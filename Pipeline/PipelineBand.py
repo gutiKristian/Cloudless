@@ -11,6 +11,13 @@ class Band:
     def __init__(self, path: str, load_on_init: bool = False, slice_index: int = 1):
         if not is_file_valid(path):
             raise FileNotFoundError("Raster does not exist!")
+        if slice_index > 1:
+            if not is_supported_slice(slice_index):
+                log.warning("Unsupported slice index, choosing the closest one..")
+                slice_index = find_closest_slice(slice_index)
+                log.info(f"New slice index: {slice_index}")
+            log.info("Raster is going to be sliced")
+
         self.path = path
         self.slice_index = slice_index
         self._gdal = None
@@ -52,6 +59,7 @@ class Band:
         if self.slice_index > 1:
             log.info(f"Slicing raster with slice index: {self.slice_index}")
             slice_raster(self.slice_index, self.raster_image)
+            log.info(f"Slicing successful, shape:({self.raster_image.shape})")
 
     def raster(self) -> np.array:
         """
