@@ -78,6 +78,10 @@ class S2Worker:
                 log.debug(f"Detected key: {key}")
                 e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
                 log.info(f"Band with spatial resolution: {self.spatial_resolution} and key: {key} initialized.")
+        for band in self.desired_bands:
+            if band not in e_dict[self.spatial_resolution]:
+                raise Exception(f"Band {band} is missing in the dataset")
+        log.info("All desired bands are present...Continue")
         return e_dict
 
     def __initialize_meta(self):
@@ -139,6 +143,7 @@ class S2Worker:
             desired_order = list(self.bands[self.spatial_resolution].keys())
         for key in desired_order:
             stack.append(self.bands[self.spatial_resolution][key].raster())
+        log.info(f"STACK ORDER: {desired_order}")
         return np.stack(stack)
 
     def __getitem__(self, item):
