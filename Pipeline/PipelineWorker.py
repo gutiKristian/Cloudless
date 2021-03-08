@@ -74,6 +74,7 @@ class S2Worker:
             e_dict[self.spatial_resolution] = {}
         for band in self.paths_to_raster:
             key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', band)[-1]
+            # TODO: is it necessary ?... maybe we'd like to init every available band (this should be independent from output bands)
             if key in self.desired_bands:
                 log.debug(f"Detected key: {key}")
                 e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
