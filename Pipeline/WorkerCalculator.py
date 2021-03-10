@@ -66,6 +66,7 @@ class WorkerCalculator:
         else:
             for d in range(dim):
                 dataset.GetRasterBand(d + 1).WriteArray(raster_img[d])
+                # dataset.SetNoDataValue(0)
         dataset.FlushCache()
         # Update worker if everything has been done correctly and worker is available
         if worker is not None:
