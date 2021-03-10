@@ -3,6 +3,8 @@ import re
 import numpy
 from typing import *
 import rasterio
+import glob
+from skimage import exposure
 from Pipeline.logger import log
 
 
@@ -30,6 +32,13 @@ def get_files_in_directory(path: str, _type: str = None) -> List[str]:
             elif not _type:
                 result.append(f)
     return result
+
+
+def extract_rgb_paths(path):
+    r = glob.glob(path + os.path.sep + "*B04*")[0]
+    g = glob.glob(path + os.path.sep + "*B03*")[0]
+    b = glob.glob(path + os.path.sep + "*B02*")[0]
+    return r, g, b
 
 
 # --------------- S2WORKER UTILS ---------------
@@ -155,3 +164,22 @@ def mark_file_sentinel2_bands(filepath, band_names, band_wavelengths):
             dataset.set_band_description(band_i,
                                          band_names[band_i - 1] + " wavelength:{}".format(band_wavelengths[band_i - 1]))
         print("New band descriptions:", dataset.descriptions)
+
+
+def rescale_intensity(image, _min, _max):
+    return exposure.rescale_intensity(image, in_range=(_min, _max), out_range=(0, 255)).astype(numpy.uint8)
+
+
+def create_rgb_uint8(r, g, b, path, tile):
+    red = rescale_intensity(rasterio.open(r).read(1), 0, 4096)
+    green = rescale_intensity(rasterio.open(g).read(1), 0, 4096)
+    blue = rescale_intensity(rasterio.open(b).read(1), 0, 4096)
+
+    rgb_profile = rasterio.open(r).profile
+    rgb_profile['dtype'] = 'uint8'
+    rgb_profile['count'] = 3
+    rgb_profile['photometric'] = "RGB"
+
+    with rasterio.open(path + os.path.sep + f"{tile}_rgb.tif", 'w', **rgb_profile) as dst:
+        for count, band in enumerate([red, green, blue], 1):
+            dst.write(band, count)

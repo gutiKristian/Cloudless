@@ -128,6 +128,8 @@ class S2Runner:
         gc.collect()
         log.info("Saving result to the files...")
         self._save_result()  # Save result into files
+        r, g, b = extract_rgb_paths(self.save_result_path)
+        create_rgb_uint8(r, g, b, self.save_result_path, self.mercator)
         log.info("Done!")
         # If there's an intention to work further with the files
         # self.result_worker = S2Worker(self.save_result_path, self.spatial_resolution, self.output_bands)
@@ -202,6 +204,8 @@ class S2Runner:
         for i, band in enumerate(self.output_bands, 0):
             self.result[band] = result[i]
         self._save_result()
+        r, g, b = extract_rgb_paths(self.save_result_path)
+        create_rgb_uint8(r, g, b, self.save_result_path, self.mercator)
         log.info("Done!")
 
     def __str__(self):
