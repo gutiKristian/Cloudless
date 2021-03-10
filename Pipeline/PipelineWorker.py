@@ -37,10 +37,10 @@ class S2Worker:
 
     def __find_images(self):
         if self.meta_data_gdal is None:
-            log.debug(f"MTDMSIL2A.xml has not been found in {self.path}")
+            log.info(f"MTDMSIL2A.xml has not been found in {self.path}")
             self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
             return
-        log.debug(f"MTDMSIL2A.xml has been found in {self.path}")
+        log.info(f"MTDMSIL2A.xml has been found in {self.path}")
         tree = ElementTree.parse(self.meta_data_path)
         root = tree.getroot()
         images = []
@@ -55,7 +55,6 @@ class S2Worker:
             self.paths_to_raster = images[7:20]
         else:
             self.paths_to_raster = images[20::]
-        log.info(f"Paths to datasets:\n {self.paths_to_raster}")
         if not is_file_valid(self.paths_to_raster[0]):
             log.info("Path from meta-data file do not exist...\nChecking the directory...")
             self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
@@ -76,13 +75,11 @@ class S2Worker:
             key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', band)[-1]
             # TODO: is it necessary ?... maybe we'd like to init every available band (this should be independent from output bands)
             if key in self.desired_bands:
-                log.debug(f"Detected key: {key}")
                 e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
-                log.info(f"Band with spatial resolution: {self.spatial_resolution} and key: {key} initialized.")
         for band in self.desired_bands:
             if band not in e_dict[self.spatial_resolution]:
                 raise Exception(f"Band {band} is missing in the dataset")
-        log.info("All desired bands are present...Continue")
+        log.info("All necessary bands are present...Continue")
         return e_dict
 
     def __initialize_meta(self):
