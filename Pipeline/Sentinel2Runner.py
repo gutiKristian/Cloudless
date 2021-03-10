@@ -161,12 +161,15 @@ class S2Runner:
         # using numpy for slicing features, could've been simple python 2D list as well
         cloud_info = np.zeros(shape=(len(self.workers), slice_index * slice_index))
         # We will do the same as for the ndvi masking, go with iterations to save RAM
-        for iteration in range((len(self.workers) - 1) // constraint + 1):
-            workers = self.workers[iteration * constraint: (iteration + 1) * constraint]
-            for i, w in enumerate(workers, 0):
+        # for iteration in range((len(self.workers) - 1) // constraint + 1):
+            # workers = self.workers[iteration * constraint: (iteration + 1) * constraint]
+            # for i, w in enumerate(workers, 0):
                 #  Imagine sit.: slice_index=5, func(w) returns [10,15,20,50,35], each of the number
                 # corresponds to the cloud percentage of that area that was calculated with the 'func'
-                cloud_info[i] = func(w)
+                # cloud_info[i] = func(w)
+
+        for i, w in enumerate(self.workers, 0):
+            cloud_info[i] = func(w)
 
         # After iterations we hold 2D array where the y-axis stands for index of worker and
         # x-axis for the cloud percentage in the xth area of yth worker, now we just have to pick the one
