@@ -66,6 +66,7 @@ class WorkerCalculator:
         else:
             for d in range(dim):
                 dataset.GetRasterBand(d + 1).WriteArray(raster_img[d])
+                # dataset.SetNoDataValue(0)
         dataset.FlushCache()
         # Update worker if everything has been done correctly and worker is available
         if worker is not None:
@@ -91,6 +92,23 @@ class WorkerCalculator:
                                    projection=worker['B04'].projection)
         del nir, red
         return _ndvi
+
+    @staticmethod
+    def s2_cloud_mask(w: S2Worker) -> np.ndarray:
+        a = w["SCL"] > 7
+        b = w["SCL"] < 11
+        c = w["SCL"] < 1
+        return (a & b) | c
+
+    @staticmethod
+    def s2_pertile_cloud_index_mask(worker: S2Worker) -> np.array:
+        arr = WorkerCalculator.s2_cloud_mask(worker)
+        result = np.zeros(shape=worker.slice_index**2)
+        for i in range(worker.slice_index**2):
+            log.info(f"Sum: {np.sum(arr)}")
+            result[i] = np.sum(arr[i]) / (arr.shape[1] * arr.shape[2])
+            log.info(f"Worker {worker.doy}, slice_index: {i}, cloud % : {result[i] * 100}")
+        return result
 
     @staticmethod
     def info():

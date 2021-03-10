@@ -3,7 +3,7 @@ from xml.etree import ElementTree  # xml
 from osgeo import gdal
 from Pipeline.PipelineBand import *
 from Pipeline.utils import *
-from colorama import Back
+from Pipeline.logger import log
 
 gdal.UseExceptions()
 
@@ -15,7 +15,7 @@ class S2Worker:
 
     def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1):
         if not is_dir_valid(path):
-            raise FileNotFoundError(Back.RED + "Dataset has not been found !")
+            raise FileNotFoundError("Dataset has not been found !")
         self.path = path
         self.spatial_resolution = spatial_res
         self.desired_bands = desired_bands
@@ -33,11 +33,14 @@ class S2Worker:
         self.bands = self.__to_band_dictionary()
         self.cloud_index = 0
         self.temp = {}
+        log.info(f"Initialized worker: {self.path}\n{self}")
 
     def __find_images(self):
         if self.meta_data_gdal is None:
-            self.paths_to_raster = get_files_in_directory(self.path)
+            log.info(f"MTDMSIL2A.xml has not been found in {self.path}")
+            self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
             return
+        log.info(f"MTDMSIL2A.xml has been found in {self.path}")
         tree = ElementTree.parse(self.meta_data_path)
         root = tree.getroot()
         images = []
@@ -52,11 +55,16 @@ class S2Worker:
             self.paths_to_raster = images[7:20]
         else:
             self.paths_to_raster = images[20::]
+        if not is_file_valid(self.paths_to_raster[0]):
+            log.info("Path from meta-data file do not exist...\nChecking the directory...")
+            self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
+        log.info(f"Final paths to raster data {self.paths_to_raster}")
 
     def __to_band_dictionary(self) -> dict:
         """
         Match list of paths of bands to dictionary for better access.
         """
+        log.info("Creating bands from raster paths...")
         if not self.paths_to_raster or len(self.paths_to_raster) == 0:
             return {}
         e_dict = dict()  # create new dictionary
@@ -65,8 +73,13 @@ class S2Worker:
             e_dict[self.spatial_resolution] = {}
         for band in self.paths_to_raster:
             key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', band)[-1]
+            # TODO: is it necessary ?... maybe we'd like to init every available band (this should be independent from output bands)
             if key in self.desired_bands:
                 e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
+        for band in self.desired_bands:
+            if band not in e_dict[self.spatial_resolution]:
+                raise Exception(f"Band {band} is missing in the dataset")
+        log.info("All necessary bands are present...Continue")
         return e_dict
 
     def __initialize_meta(self):
@@ -76,8 +89,9 @@ class S2Worker:
             self.data_take = datetime.strptime(self.meta_data["DATATAKE_1_DATATAKE_SENSING_START"],
                                                "%Y-%m-%dT%H:%M:%S.%fZ")
             self.doy = self.data_take.timetuple().tm_yday
+            log.info("Meta data initialized.")
         except Exception as e:
-            print('Opening meta data file raised an exception', e, "\nWorker continues without metadata file!")
+            log.warning('Opening meta data file raised an exception\n', e, "\nWorker continues without metadata file!")
 
     def get_image_resolution(self) -> Tuple[int, int]:
         if self.spatial_resolution == 10:
@@ -87,7 +101,7 @@ class S2Worker:
         return 1830, 1830
 
     def add_another_band(self) -> None:
-        pass  # TODO: RESAMPLE AND UPDATE THE DICT
+        pass  # TODO: RESAMPLE AND UPDATE THE DICT AND DESIRED BANDS OR HOWEVER IT IS CALLED NOW
 
     def load_bands(self, desired_bands: List[str] = None):
         """
@@ -121,12 +135,14 @@ class S2Worker:
         Methods stacks all available bands.
         It forms a cube of bands.
         @param desired_order: user may set his order
+        WARNING: if no desired_order is specified, the order is random therefore might cause problems with the masking.
         """
         stack = []
         if desired_order is None:
             desired_order = list(self.bands[self.spatial_resolution].keys())
         for key in desired_order:
             stack.append(self.bands[self.spatial_resolution][key].raster())
+        log.info(f"STACK ORDER: {desired_order}")
         return np.stack(stack)
 
     def __getitem__(self, item):
@@ -137,3 +153,6 @@ class S2Worker:
         :return: instance of a Band class
         """
         return self.bands[self.spatial_resolution][item]
+
+    def __str__(self):
+        return f"Bands: {self.bands}\nDoy: {self.doy}"
