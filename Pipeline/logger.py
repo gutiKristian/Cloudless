@@ -2,6 +2,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
+
 # where the logs should go
 file_handler = logging.FileHandler("sentinel_pipeline_logs.log")
 console_handler = logging.StreamHandler()
