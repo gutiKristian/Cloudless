@@ -8,12 +8,13 @@ import threading
 from zipfile import ZipFile
 import pandas
 import requests
-import json
+import hashlib
 import re
 from shapely.geometry import Polygon
 from DownloadExceptions import *
 from Pipeline.logger import log
 import datetime
+from Pipeline.utils import extract_mercator, is_dir_valid
 
 
 # Download bands or full file option ..... bands need to be provided...
@@ -61,29 +62,94 @@ class Downloader:
         self.text_search = text_search
         self.platform_name = platform_name  # even though this is Sentinel2.py we may extract this class someday
         #  After successful initialization of Downloader, obj_cache contains: formatted string for cloud, time and
-        #  cached requests
-        self.__obj_cache = {'request': {}}
+        #  cached requests NOT ALL! all requests are cached after before_download is ran
+        self.__obj_cache = {'request': {}, 'polygon': False}
         self.__cache = {}
         # Check
         self.__minimum_requirements()
 
     #  'Public'
 
+    def download_file(self, url, path, chunk_size=8192, check_sum=None) -> bool:
+        """
+        Downloads the file. Returns False on failure.
+        """
+        with self.session.get(url, stream=True) as req:
+            req.raise_for_status()
+            with open(path, 'wb') as f:
+                for chunk in req.iter_content(chunk_size=chunk_size):
+                    f.write(chunk)
+                f.flush()
+        if not check_sum:
+            log.warning("Check sum not provided")
+            return True
+        return hashlib.md5(path) == check_sum
+
     # downloading is triggered by the user, each time he calls this method
-    def download_tile_whole(self):
-        pass
+    def download_tile_whole(self, unzip: bool = True):
+        """
+        Downloads entire granule dataset, all meta data and spatial resolution images.
+        File will be structured in .SAFE format. Yields path to the downloaded content.
+        """
+        self.__before_download()
+        generator = self.__get_next_download()
+        mercator, entries = next(generator)
+        # create directory mercator and download the entries
+        working_path = self.root_path + os.path.sep + mercator
+        if is_dir_valid(working_path):
+            log.warning(f"Path: {working_path} already exists, the files in the directory will be deleted.")
+            shutil.rmtree(working_path)
+        os.mkdir(working_path)
+        threads = []
+        for entry in entries:
+            # 'link':[{'href': "https://dhr1.cesnet.cz/odata/v1/Products('')/$value"}, link for checksum ]
+            zip_file = working_path + os.path.sep + entry['title'] + ".zip"
+            link = entry['link'][0]['href']
+            check_sum = self.session.get(entry['link'][1]['href'] + "/Checksum/Value/$value")
+            if not self.download_file(link, zip_file, check_sum=check_sum):
+                log.error(f"File: {zip_file} wasn't downloaded properly")
+                os.remove(zip_file)
+            else:
+                if unzip:
+                    t = threading.Thread(target=Downloader.un_zip, args=(zip_file,))
+                    threads.append(t)
+                    t.start()
+                    log.info("Started unzipping in another thread.")
+                log.info(f"File {working_path} successfully downloaded")
+            yield
+        for thread in threads:
+            thread.join()
+        log.info("Everything downloaded")
 
     def download_tile_bands(self, bands: List[str], primary_spatial_res: int):
-        pass
+        self.__before_download()
+        generator = self.__get_next_download()
+        mercator, entries = next(generator)
+        # create directory mercator and download the entries
 
     # all_... methods download everything at once
-    def download_all_whole(self, unzip: bool = False):
-        pass
+    def download_all_whole(self, unzip: bool = False) -> List[str]:
+        """
+        Returns list of paths to the downloaded content.
+        """
+        paths = []
+        for e in self.download_tile_whole(unzip=unzip):
+            paths.append(e)
+        return e
 
     def download_all_bands(self, bands: List[str], primary_spatial_res: int):
         pass
 
     #  Mangled
+
+    def __get_next_download(self):
+        """
+        Traverse __cache and return meta data for mercator tiles that haven't been downloaded.
+        """
+        if len(self.__cache.keys()) == 0:
+            return None
+        for merc, feed in self.__obj_cache.items():
+            yield merc, feed
 
     def __build_info_queries(self) -> List[str]:
         """
@@ -91,15 +157,21 @@ class Downloader:
         and list of urls for each tile if it is preferred method.
         """
         self.__obj_cache['cloud'] = "[{} TO {}]".format(self.cloud_coverage[0], self.cloud_coverage[1])
-        self.__obj_cache['time'] = "[" + self.date[0].strftime("%Y-%m-%d") + "T00:00:00.000Z" + " TO " + self.date[
-            1].strftime(
-            "%Y-%m-%d") + "T23:59:59.999Z]"
+        self.__obj_cache['time'] = "[" + self.date[0].strftime("%Y-%m-%d") + "T00:00:00.000Z" + " TO " + self.date[1] \
+            .strftime("%Y-%m-%d") + "T23:59:59.999Z]"
         result = self.url + "?=( platformname:{} AND producttype:{} AND cloudcoverpercentage:{} " \
                             "AND beginposition:{}".format(self.platform_name, self.product_type,
                                                           self.__obj_cache['cloud'], self.__obj_cache['time'])
+        suffix = "&rows=100&format=json"
         if self.polygon:
-            return [result + ' footprint:"Intersects(Polygon(({})))"'.format(
-                ",".join("{} {}".format(p[0], p[1]) for p in list(self.polygon.exterior.coords)))]
+            self.__obj_cache['polygon'] = True
+            return [result + ' AND footprint:"Intersects(Polygon(({})))"'.format(
+                ",".join("{} {}".format(p[0], p[1]) for p in list(self.polygon.exterior.coords))) + suffix]
+        if self.mercator_tiles:
+            return [result + " AND *{}* ".format(tile) + suffix for tile in self.mercator_tiles]
+        if self.tile_uuids:
+            return [self.url + "?=(uuid:{})".format(uuid) for uuid in self.tile_uuids]
+        return [result + " AND {} ".format(self.text_search) + suffix]
 
     def __minimum_requirements(self):
         """
@@ -127,12 +199,32 @@ class Downloader:
             overall_datasets += self.__obj_cache['requests'][url]['opensearch:totalResults']
         raise IncorrectInput("Not enough datasets to download or run the pipeline for this input")
 
+    def __parse_cached_response(self):
+        """
+        Response for Polygon is unstructured and messy for us, since we download the datasets by tiles
+        and therefore we are able to run pipeline meanwhile another granule(tile) dataset is downloading.
+        """
+        entries = list(self.__obj_cache['request'].values())[0]
+        for entry in entries:
+            mercator = extract_mercator(entry['title'])
+            if mercator not in self.__cache:
+                self.__cache[mercator] = []
+            self.__cache[mercator].append(entry)
+        log.info(f"Mercator tiles extraced from the response: {self.__cache.keys()}")
+
     def __before_download(self):
         """
         This method gathers the remaining data that weren't downloaded/requested during the initialization
         because of response time optimization.
         """
-        pass
+        for url in self.__obj_cache['urls']:
+            if self.__obj_cache['polygon']:
+                # Already have full request just parse it
+                self.__parse_cached_response()
+            if url not in self.__obj_cache['request']:
+                self.__obj_cache['request'][url] = pandas.read_json(self.session.get(url).content)['feed']
+            # entry for uuid is just dict
+        self.__parse_cached_response()
 
     #  Static
 
