@@ -14,8 +14,8 @@ class S2JIT:
         """
         Per pixel masking of the best ndvi pixels.
         @param ndvi: ndvi of each worker
-        @param offset: offsetting workers, making ndvi with workers[10:20] -> offset = 9
-        :return: mask of indices of the workers and worker map of used workers
+        @param offset: offsetting granules, making ndvi with granules[10:20] -> offset = 9
+        :return: mask of indices of the granules and worker map of used granules
         """
         result = np.zeros(shape=(ndvi.shape[1], ndvi.shape[2]))
         workers = np.zeros(ndvi.shape[0] + offset)

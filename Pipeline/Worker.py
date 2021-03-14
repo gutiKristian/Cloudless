@@ -4,12 +4,12 @@ import shutil
 
 from numba.typed import List as LIST
 from Pipeline.logger import log
-from Pipeline.WorkerCalculator import *
+from Pipeline.GranuleCalculator import *
 from Pipeline.Masks import *
 from Pipeline.Plotting import *
 
 
-class S2Runner:
+class S2Worker:
 
     def __init__(self, path: str, spatial_resolution: int, slice_index: int = 1, output_bands: List[str] = []):
         """
@@ -38,9 +38,9 @@ class S2Runner:
         #  Datasets in SAFE format
         self.datasets = get_subdirectories(path)
         self._validate_files_by_mercator()
-        # Initialize workers
-        self.workers = [S2Worker(_path, spatial_resolution, self.output_bands, slice_index) for _path in self.datasets
-                        if s2_is_safe_format(_path)]
+        # Initialize granules
+        self.granules = [S2Granule(_path, spatial_resolution, self.output_bands, slice_index) for _path in self.datasets
+                         if s2_is_safe_format(_path)]
         #  The result of masking is stored in this variable, "B01": numpy.array, etc.
         self.result = {}
         self.save_result_path = self.main_dataset_path + os.path.sep + "result"
@@ -65,22 +65,22 @@ class S2Runner:
         except FileExistsError:
             shutil.rmtree(self.save_result_path)
             os.mkdir(self.save_result_path)
-        projection = list(self.workers[-1].bands[self.spatial_resolution].values())[0].projection
-        geo_transform = list(self.workers[-1].bands[self.spatial_resolution].values())[0].geo_transform
+        projection = list(self.granules[-1].bands[self.spatial_resolution].values())[0].projection
+        geo_transform = list(self.granules[-1].bands[self.spatial_resolution].values())[0].geo_transform
         for key in self.result.keys():
             path = self.save_result_path + "/" + key + "_" + str(self.spatial_resolution)
-            WorkerCalculator.save_band(raster_img=self.result[key], name=key + "_" + str(self.spatial_resolution),
-                                       path=path, projection=projection, geo_transform=geo_transform)
+            GranuleCalculator.save_band(raster_img=self.result[key], name=key + "_" + str(self.spatial_resolution),
+                                        path=path, projection=projection, geo_transform=geo_transform)
 
     def _load_bands(self, desired_bands: List[str] = None):
-        for worker in self.workers:
+        for worker in self.granules:
             worker.load_bands(desired_bands)
 
     def _release_bands(self):
         """
         Free the memory. Set the references for the numpy arrays to None.
         """
-        for worker in self.workers:
+        for worker in self.granules:
             worker.free_resources()
         self.result = {}
 
@@ -97,19 +97,19 @@ class S2Runner:
         ndvi_result = np.ones(shape=(res_x, res_y), dtype=np.float) * (-10)
         result = np.ones(shape=(len(self.output_bands), res_x, res_y), dtype=np.uint16)
         doy = np.zeros(shape=(res_x, res_y), dtype=np.uint16)
-        log.info(f"{(len(self.workers) - 1) // constraint + 1} iteration(s) expected!")
-        for iteration in range((len(self.workers) - 1) // constraint + 1):
+        log.info(f"{(len(self.granules) - 1) // constraint + 1} iteration(s) expected!")
+        for iteration in range((len(self.granules) - 1) // constraint + 1):
             # compute NDVI
             current_doy = LIST()
             current_data = LIST()
             log.info(f"Calculating NDVI arrays for iteration {iteration}")
-            # Acquire first batch of workers, for instance constraint=4, workers=[0,1,2,3]
-            workers = self.workers[iteration * constraint: (iteration + 1) * constraint]
+            # Acquire first batch of granules, for instance constraint=4, granules=[0,1,2,3]
+            workers = self.granules[iteration * constraint: (iteration + 1) * constraint]
             for i, w in enumerate(workers, 0):
                 current_doy.append(w.doy)
                 # Prepare data
                 w.load_bands()
-                WorkerCalculator.s2_ndvi(w)
+                GranuleCalculator.s2_ndvi(w)
                 # TODO: take mask as function (like per-tile)
                 mask = (w["B02"] > 100) & (w["B04"] > 100) & (w["B8A"] > 500) & (w["B8A"] < 8000) & (w["AOT"] < 100)
                 ndvi_arrays[i] = np.ma.array(w.temp["NDVI"], mask=mask, fill_value=0).filled()
@@ -132,12 +132,12 @@ class S2Runner:
         create_rgb_uint8(r, g, b, self.save_result_path, self.mercator)
         log.info("Done!")
         # If there's an intention to work further with the files
-        # self.result_worker = S2Worker(self.save_result_path, self.spatial_resolution, self.output_bands)
+        # self.result_worker = S2Granule(self.save_result_path, self.spatial_resolution, self.output_bands)
         log.debug("New self.worker attribute initialized.")
         log.info("Masking done!")
         return 0
 
-    def per_tile(self, constraint: int = 5, func=WorkerCalculator.s2_pertile_cloud_index_mask):
+    def per_tile(self, constraint: int = 5, func=GranuleCalculator.s2_pertile_cloud_index_mask):
         """
         @param: constraint - how many tiles are allowed to be opened simultaneously
         @param: func - function which takes worker as an argument and returns cloud percentage for each slice
@@ -145,10 +145,10 @@ class S2Runner:
         log.info(f"Running per-tile masking. Dataset {self.main_dataset_path}")
         # Gather information
         res_x, res_y = s2_get_resolution(self.spatial_resolution)
-        slice_index = self.workers[-1].slice_index
+        slice_index = self.granules[-1].slice_index
 
         # Check if might proceed to the next step which is per-tile procedure
-        for worker in self.workers:
+        for worker in self.granules:
             if worker.slice_index != slice_index:
                 raise Exception("Terminating job. Workers with different slice index are not allowed!")
 
@@ -159,18 +159,18 @@ class S2Runner:
         # shape -> bands, slices, x, y
         res = np.zeros(shape=(len(self.output_bands), doy.shape[0], doy.shape[1], doy.shape[2]), dtype=np.uint16)
         log.info(f"Initialized result array shape: {len(self.output_bands), doy.shape[0], doy.shape[1], doy.shape[2]}")
-        log.info(f"{(len(self.workers) - 1) // constraint + 1} iteration(s) expected!")
+        log.info(f"{(len(self.granules) - 1) // constraint + 1} iteration(s) expected!")
         # using numpy for slicing features, could've been simple python 2D list as well
-        cloud_info = np.zeros(shape=(len(self.workers), slice_index * slice_index))
+        cloud_info = np.zeros(shape=(len(self.granules), slice_index * slice_index))
         # We will do the same as for the ndvi masking, go with iterations to save RAM
-        # for iteration in range((len(self.workers) - 1) // constraint + 1):
-            # workers = self.workers[iteration * constraint: (iteration + 1) * constraint]
-            # for i, w in enumerate(workers, 0):
+        # for iteration in range((len(self.granules) - 1) // constraint + 1):
+            # granules = self.granules[iteration * constraint: (iteration + 1) * constraint]
+            # for i, w in enumerate(granules, 0):
                 #  Imagine sit.: slice_index=5, func(w) returns [10,15,20,50,35], each of the number
                 # corresponds to the cloud percentage of that area that was calculated with the 'func'
                 # cloud_info[i] = func(w)
 
-        for i, w in enumerate(self.workers, 0):
+        for i, w in enumerate(self.granules, 0):
             cloud_info[i] = func(w)
 
         # After iterations we hold 2D array where the y-axis stands for index of worker and
@@ -185,15 +185,15 @@ class S2Runner:
             else:
                 workers_to_use[winner] = [i]
         for value in workers_to_use.keys():
-            self.workers[value].load_bands()
-            stack = self.workers[value].stack_bands(self.output_bands)
-            self.workers[value].free_resources()
+            self.granules[value].load_bands()
+            stack = self.granules[value].stack_bands(self.output_bands)
+            self.granules[value].free_resources()
             log.info(f"Loading bands for worker with index: {value}, "
                      f"worker occupies slices - {workers_to_use[value]}")
             for sl_index in workers_to_use[value]:
-                log.info(f"Filling worker: {value} with doy: {self.workers[value].doy} on slice index {sl_index} "
+                log.info(f"Filling worker: {value} with doy: {self.granules[value].doy} on slice index {sl_index} "
                          f"for all available bands")
-                doy[sl_index] = self.workers[value].doy
+                doy[sl_index] = self.granules[value].doy
                 res[:, sl_index, :, :] = stack[:, sl_index, :, :]
             del stack
         self.result["DOY"] = glue_raster(doy, res_y, res_x)

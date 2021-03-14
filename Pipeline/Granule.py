@@ -1,16 +1,16 @@
 from datetime import datetime
 from xml.etree import ElementTree  # xml
 from osgeo import gdal
-from Pipeline.PipelineBand import *
+from Pipeline.Band import *
 from Pipeline.utils import *
 from Pipeline.logger import log
 
 gdal.UseExceptions()
 
 
-class S2Worker:
+class S2Granule:
     """
-    This class can be instantiated only inside S2Runner.
+    This class can be instantiated only inside S2Worker.
     """
 
     def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1):

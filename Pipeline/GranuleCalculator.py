@@ -1,13 +1,13 @@
-from Pipeline.PipelineWorker import *
+from Pipeline.Granule import *
 from Pipeline.utils import *
 from osgeo import gdal
 
 
-class WorkerCalculator:
+class GranuleCalculator:
 
     #  TODO: Make worker argument optional, to generalize this method
     @staticmethod
-    def save_band(raster_img, name: str, worker: S2Worker = None, path: str = None, driver: str = "GTiff",
+    def save_band(raster_img, name: str, granule: S2Granule = None, path: str = None, driver: str = "GTiff",
                   d_type: gdal.Dataset = gdal.GDT_UInt16, geo_transform: gdal.Dataset = None,
                   projection: gdal.Dataset = None):
 
@@ -21,11 +21,11 @@ class WorkerCalculator:
         else:
             raise Exception("Bad dimension of the raster image")
 
-        if worker is not None:
+        if granule is not None:
             # saving connected with worker
             if path is None:
-                path = "/".join(worker.paths_to_raster[:-1].split(os.path.sep)) + "/" + name
-            x_res, y_res = worker.get_image_resolution()
+                path = "/".join(granule.paths_to_raster[:-1].split(os.path.sep)) + "/" + name
+            x_res, y_res = granule.get_image_resolution()
         else:
             x_res, y_res = raster_img.shape[0], raster_img.shape[1]
 
@@ -69,45 +69,45 @@ class WorkerCalculator:
                 # dataset.SetNoDataValue(0)
         dataset.FlushCache()
         # Update worker if everything has been done correctly and worker is available
-        if worker is not None:
-            worker.update_worker(name, path)
+        if granule is not None:
+            granule.update_worker(name, path)
         del dataset, driver
         return path  # path where it is saved
 
     @staticmethod
-    def s2_ndvi(worker: S2Worker, save: bool = False):
+    def s2_ndvi(granule: S2Granule, save: bool = False):
         """
         Calculates the Normalized difference vegetation index
-        :param worker: worker that provides us data
+        :param granule: worker that provides us data
         :param save: if user wants to save the result inside the working dir of the worker
         :return: numpy array
         """
-        nir = worker['B8A'].raster().astype(float)
-        red = worker['B04'].raster().astype(float)
+        nir = granule['B8A'].raster().astype(float)
+        red = granule['B04'].raster().astype(float)
         _ndvi = ndvi(red=red, nir=nir)
-        worker.temp["NDVI"] = _ndvi
+        granule.temp["NDVI"] = _ndvi
         if not save:
             return _ndvi
-        WorkerCalculator.save_band(worker, _ndvi, "NDVI", geo_transform=worker['B04'].geotransform,
-                                   projection=worker['B04'].projection)
+        GranuleCalculator.save_band(granule=granule, raster_img=_ndvi, geo_transform=granule['B04'].geotransform,
+                                    projection=granule['B04'].projection)
         del nir, red
         return _ndvi
 
     @staticmethod
-    def s2_cloud_mask(w: S2Worker) -> np.ndarray:
+    def s2_cloud_mask(w: S2Granule) -> np.ndarray:
         a = w["SCL"] > 7
         b = w["SCL"] < 11
         c = w["SCL"] < 1
         return (a & b) | c
 
     @staticmethod
-    def s2_pertile_cloud_index_mask(worker: S2Worker) -> np.array:
-        arr = WorkerCalculator.s2_cloud_mask(worker)
-        result = np.zeros(shape=worker.slice_index**2)
-        for i in range(worker.slice_index**2):
+    def s2_pertile_cloud_index_mask(granule: S2Granule) -> np.array:
+        arr = GranuleCalculator.s2_cloud_mask(granule)
+        result = np.zeros(shape=granule.slice_index**2)
+        for i in range(granule.slice_index**2):
             log.info(f"Sum: {np.sum(arr)}")
             result[i] = np.sum(arr[i]) / (arr.shape[1] * arr.shape[2])
-            log.info(f"Worker {worker.doy}, slice_index: {i}, cloud % : {result[i] * 100}")
+            log.info(f"Worker {granule.doy}, slice_index: {i}, cloud % : {result[i] * 100}")
         return result
 
     @staticmethod
