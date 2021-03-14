@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import threading
 from zipfile import ZipFile
-
+import pandas
 import requests
 import json
 import re
@@ -60,7 +60,9 @@ class Downloader:
         self.mercator_tiles = Downloader.validate_mercator_tiles(mercator_tiles)
         self.text_search = text_search
         self.platform_name = platform_name  # even though this is Sentinel2.py we may extract this class someday
-        self.__obj_cache = {}
+        #  After successful initialization of Downloader, obj_cache contains: formatted string for cloud, time and
+        #  cached requests
+        self.__obj_cache = {'request': {}}
         self.__cache = {}
         # Check
         self.__minimum_requirements()
@@ -81,15 +83,23 @@ class Downloader:
     def download_all_bands(self, bands: List[str], primary_spatial_res: int):
         pass
 
-    #  Mangled [YYYY-MM-DDT00:00:00.000Z
+    #  Mangled
 
-    def __build_info_query(self) -> str:
+    def __build_info_queries(self) -> List[str]:
+        """
+        Build initial request for the required aoi or tiles. Method returns list of 1 url for polygon
+        and list of urls for each tile if it is preferred method.
+        """
         self.__obj_cache['cloud'] = "[{} TO {}]".format(self.cloud_coverage[0], self.cloud_coverage[1])
-        self.__obj_cache['time'] = "[" + self.date[0].strftime("%Y-%m-%d") + "T00:00:00.000Z" + " TO " + self.date[1].strftime(
+        self.__obj_cache['time'] = "[" + self.date[0].strftime("%Y-%m-%d") + "T00:00:00.000Z" + " TO " + self.date[
+            1].strftime(
             "%Y-%m-%d") + "T23:59:59.999Z]"
         result = self.url + "?=( platformname:{} AND producttype:{} AND cloudcoverpercentage:{} " \
-                            "AND beginposition:{}".format(self.platform_name, self.product_type, self.__obj_cache['cloud'], self.__obj_cache['time'])
-        pass
+                            "AND beginposition:{}".format(self.platform_name, self.product_type,
+                                                          self.__obj_cache['cloud'], self.__obj_cache['time'])
+        if self.polygon:
+            return [result + ' footprint:"Intersects(Polygon(({})))"'.format(
+                ",".join("{} {}".format(p[0], p[1]) for p in list(self.polygon.exterior.coords)))]
 
     def __minimum_requirements(self):
         """
@@ -105,7 +115,24 @@ class Downloader:
                 log.info("Found regex for the tile!")
             log.info("Area defined with regex in text search")
         log.info("Downloader has enough information, performing initial request")
-        initial = self.__build_info_query()
+        #  A bit clumsy but it's made to speed up the response when user is creating job, it's just a confirmation
+        # that the job is valid and we've got dataset s to work with
+        self.__obj_cache['urls'] = self.__build_info_queries()
+        overall_datasets = 0
+        for url in self.__obj_cache['urls']:
+            if overall_datasets > 0:
+                log.info("Required minimum of datasets achieved.")
+                return
+            self.__obj_cache['requests'][url] = pandas.read_json(self.session.get(url).content)['feed']
+            overall_datasets += self.__obj_cache['requests'][url]['opensearch:totalResults']
+        raise IncorrectInput("Not enough datasets to download or run the pipeline for this input")
+
+    def __before_download(self):
+        """
+        This method gathers the remaining data that weren't downloaded/requested during the initialization
+        because of response time optimization.
+        """
+        pass
 
     #  Static
 
