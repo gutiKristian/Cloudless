@@ -11,18 +11,23 @@ import requests
 import hashlib
 import re
 from shapely.geometry import Polygon
-from DownloadExceptions import *
 from Pipeline.logger import log
+from Pipeline.utils import bands_for_resolution
 import datetime
 from Pipeline.utils import extract_mercator, is_dir_valid
+from Download.DownloadExceptions import *
 
 
 # Download bands or full file option ..... bands need to be provided...
 # If bands are not present in the spatial res they are downloaded with other spat. res and resampled
 
 class Downloader:
+    meta_url = "https://dhr1.cesnet.cz/odata/v1/Products('{}')/Nodes('{}.SAFE')/Nodes('MTD_MSIL2A.xml')/$value"
+    raster_url = "https://dhr1.cesnet.cz/odata/v1/Products('{}')/Nodes('{}.SAFE')/Nodes('GRANULE')/" \
+                 "Nodes('{}')/Nodes('IMG_DATA')/Nodes('R{}')/Nodes('{}.jp2')/$value"
+
     def __init__(self, user_name: str, password: str, root_path: str = None, polygon: List = None,
-                 date: datetime = (datetime.datetime.now() - datetime.timedelta(days=50), datetime.datetime.now()),
+                 date: datetime = (datetime.datetime.now() - datetime.timedelta(days=14), datetime.datetime.now()),
                  uuid: List[str] = None, cloud_coverage: List[int] = None, product_type: str = "S2MSI2A",
                  mercator_tiles: List[str] = None, text_search: str = None, platform_name: str = "Sentinel-2"):
         """
@@ -49,7 +54,10 @@ class Downloader:
         self.root_path = root_path or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.session = requests.Session()
         self.session.auth = (self.user_name, self.password)
-        self.polygon = Downloader.create_polygon(polygon)
+        self.polygon = None
+        if polygon is not None:
+            self.polygon = Downloader.create_polygon(polygon)
+        cloud_coverage = cloud_coverage if cloud_coverage else [0, 95]  # default value
         if not Downloader.is_valid_cloud_cov(cloud_coverage):
             raise IncorrectInput("Bad format: cloud coverage.")
         self.cloud_coverage = cloud_coverage
@@ -63,12 +71,65 @@ class Downloader:
         self.platform_name = platform_name  # even though this is Sentinel2.py we may extract this class someday
         #  After successful initialization of Downloader, obj_cache contains: formatted string for cloud, time and
         #  cached requests NOT ALL! all requests are cached after before_download is ran
-        self.__obj_cache = {'request': {}, 'polygon': False}
+        self.__obj_cache = {'requests': {}, 'polygon': False}
         self.__cache = {}
         # Check
         self.__minimum_requirements()
 
     #  'Public'
+
+    def download_meta_data(self, url, filepath) -> str:
+        """
+        Downloads the meta-data MTD_MSIL2A.xml and saves it under filepath + MTD_MSIL2A.xml
+        """
+        response = self.session.get(url)
+        if response.status_code != 200:
+            raise Exception("Could not donwload the meta-data file.")
+        content = response.content
+        with open(filepath + "MTD_MSIL2A.xml", 'wb') as f:
+            f.write(content)
+            f.flush()
+        return response.text
+
+    def __get_group_matches(self, spatial: str, meta: str, result, bands, entry) -> set:
+        pattern = re.compile(
+            r'<IMAGE_FILE>GRANULE/([0-9A-Z_]+)/IMG_DATA/R{}/([0-9A-Z_]+_(.*)_{})</IMAGE_FILE>'.format(spatial,
+                                                                                                       spatial))
+        for m in re.finditer(pattern, meta):
+            print(m.group(3))
+            if not len(bands.intersection({m.group(3)})) > 0:
+                continue
+            bands = bands - {m.group(3)}
+            result.append((Downloader.raster_url.format(entry["id"], entry["title"], m.group(1),
+                                                         spatial, m.group(2)), m.group(2)))
+        return bands
+
+    def get_raster_urls(self, meta, entry, spatial_res, bands):
+        """
+        @param: meta - content of xml in string form
+        @param: entry - data of the tile from the request
+        @param: what spatial resolution should be
+        :return: tuple - url and the name of the raster
+        """
+        bands = set(bands)
+        raster_urls = []
+        bands = self.__get_group_matches(spatial_res, meta, raster_urls, bands, entry)
+
+        if len(bands) == 0:
+            return raster_urls
+
+        if spatial_res != "10m":
+            bands = self.__get_group_matches("10m", meta, raster_urls, bands, entry)
+            if len(bands) == 0:
+                return raster_urls
+        if spatial_res != "20m":
+            bands = self.__get_group_matches("20m", meta, raster_urls, bands, entry)
+            if len(bands) == 0:
+                return raster_urls
+        if spatial_res != "60m":
+            bands = self.__get_group_matches("10m", meta, raster_urls, bands, entry)
+        log.warning(f"Could not find {bands}.")
+        return raster_urls
 
     def download_file(self, url, path, chunk_size=8192, check_sum=None) -> bool:
         """
@@ -92,40 +153,55 @@ class Downloader:
         File will be structured in .SAFE format. Yields path to the downloaded content.
         """
         self.__before_download()
-        generator = self.__get_next_download()
-        mercator, entries = next(generator)
-        # create directory mercator and download the entries
-        working_path = self.root_path + os.path.sep + mercator
-        if is_dir_valid(working_path):
-            log.warning(f"Path: {working_path} already exists, the files in the directory will be deleted.")
-            shutil.rmtree(working_path)
-        os.mkdir(working_path)
-        threads = []
-        for entry in entries:
-            # 'link':[{'href': "https://dhr1.cesnet.cz/odata/v1/Products('')/$value"}, link for checksum ]
-            zip_file = working_path + os.path.sep + entry['title'] + ".zip"
-            link = entry['link'][0]['href']
-            check_sum = self.session.get(entry['link'][1]['href'] + "/Checksum/Value/$value")
-            if not self.download_file(link, zip_file, check_sum=check_sum):
-                log.error(f"File: {zip_file} wasn't downloaded properly")
-                os.remove(zip_file)
-            else:
-                if unzip:
-                    t = threading.Thread(target=Downloader.un_zip, args=(zip_file,))
-                    threads.append(t)
-                    t.start()
-                    log.info("Started unzipping in another thread.")
-                log.info(f"File {working_path} successfully downloaded")
-            yield
-        for thread in threads:
-            thread.join()
+
+        for mercator, entries in self.__get_next_download():
+            working_path = self.root_path + os.path.sep + mercator
+            # create directory mercator and download the entries
+            Downloader.prepare_dir(working_path)
+            threads = []
+            for entry in entries:
+                # 'link':[{'href': "https://dhr1.cesnet.cz/odata/v1/Products('')/$value"}, link for checksum ]
+                zip_file = working_path + os.path.sep + entry['title'] + ".zip"
+                link = entry['link'][0]['href']
+                check_sum = self.session.get(entry['link'][1]['href'] + "/Checksum/Value/$value")
+                if not self.download_file(link, zip_file, check_sum=check_sum):
+                    log.error(f"File: {zip_file} wasn't downloaded properly")
+                    os.remove(zip_file)
+                else:
+                    if unzip:
+                        t = threading.Thread(target=Downloader.un_zip, args=(zip_file,))
+                        threads.append(t)
+                        t.start()
+                        log.info("Started unzipping in another thread.")
+                    log.info(f"File {working_path} successfully downloaded")
+            for thread in threads:
+                thread.join()
+            yield working_path
+
         log.info("Everything downloaded")
 
-    def download_tile_bands(self, bands: List[str], primary_spatial_res: int):
+    def download_tile_bands(self, primary_spatial_res: str, bands: List[str] = None):
+        """
+        @param primary_spatial_res: 20 -> 20m, 10 -> 10m, 60 -> 60m
+        @param bands: ["B01", ... ]
+        """
         self.__before_download()
-        generator = self.__get_next_download()
-        mercator, entries = next(generator)
-        # create directory mercator and download the entries
+        if bands is None:
+            bands = bands_for_resolution(primary_spatial_res)
+
+        for mercator, entries in self.__get_next_download():
+            working_path = self.root_path + os.path.sep + mercator  # path where all datasets are going to be downloaded
+            Downloader.prepare_dir(working_path)
+            for entry in entries:
+                data_set_path = working_path + os.path.sep + entry['title'] + os.path.sep
+                Downloader.prepare_dir(data_set_path)
+                meta_data = self.download_meta_data(Downloader.meta_url.format(entry["id"], entry["title"]),
+                                                    data_set_path)
+                raster_urls = self.get_raster_urls(meta_data, entry, primary_spatial_res, bands)
+                for url, name in raster_urls:
+                    self.download_file(url, data_set_path + name + ".jp2")
+                yield data_set_path
+        log.info("All downloaded")
 
     # all_... methods download everything at once
     def download_all_whole(self, unzip: bool = False) -> List[str]:
@@ -135,10 +211,13 @@ class Downloader:
         paths = []
         for e in self.download_tile_whole(unzip=unzip):
             paths.append(e)
-        return e
+        return paths
 
-    def download_all_bands(self, bands: List[str], primary_spatial_res: int):
-        pass
+    def download_all_bands(self, primary_spatial_res: str, bands: List[str] = None):
+        paths = []
+        for e in self.download_tile_bands(primary_spatial_res, bands):
+            paths.append(e)
+        return paths
 
     #  Mangled
 
@@ -148,7 +227,7 @@ class Downloader:
         """
         if len(self.__cache.keys()) == 0:
             return None
-        for merc, feed in self.__obj_cache.items():
+        for merc, feed in self.__cache.items():
             yield merc, feed
 
     def __build_info_queries(self) -> List[str]:
@@ -159,7 +238,7 @@ class Downloader:
         self.__obj_cache['cloud'] = "[{} TO {}]".format(self.cloud_coverage[0], self.cloud_coverage[1])
         self.__obj_cache['time'] = "[" + self.date[0].strftime("%Y-%m-%d") + "T00:00:00.000Z" + " TO " + self.date[1] \
             .strftime("%Y-%m-%d") + "T23:59:59.999Z]"
-        result = self.url + "?=( platformname:{} AND producttype:{} AND cloudcoverpercentage:{} " \
+        result = self.url + "search?q=( platformname:{} AND producttype:{} AND cloudcoverpercentage:{} " \
                             "AND beginposition:{}".format(self.platform_name, self.product_type,
                                                           self.__obj_cache['cloud'], self.__obj_cache['time'])
         suffix = "&rows=100&format=json"
@@ -168,7 +247,7 @@ class Downloader:
             return [result + ' AND footprint:"Intersects(Polygon(({})))"'.format(
                 ",".join("{} {}".format(p[0], p[1]) for p in list(self.polygon.exterior.coords))) + suffix]
         if self.mercator_tiles:
-            return [result + " AND *{}* ".format(tile) + suffix for tile in self.mercator_tiles]
+            return [result + " AND *{}*)".format(tile) + suffix for tile in self.mercator_tiles]
         if self.tile_uuids:
             return [self.url + "?=(uuid:{})".format(uuid) for uuid in self.tile_uuids]
         return [result + " AND {} ".format(self.text_search) + suffix]
@@ -196,7 +275,10 @@ class Downloader:
                 log.info("Required minimum of datasets achieved.")
                 return
             self.__obj_cache['requests'][url] = pandas.read_json(self.session.get(url).content)['feed']
-            overall_datasets += self.__obj_cache['requests'][url]['opensearch:totalResults']
+            overall_datasets += int(self.__obj_cache['requests'][url]['opensearch:totalResults'])
+        if overall_datasets > 0:
+            log.info("Required minimum of datasets achieved.")
+            return
         raise IncorrectInput("Not enough datasets to download or run the pipeline for this input")
 
     def __parse_cached_response(self):
@@ -204,7 +286,7 @@ class Downloader:
         Response for Polygon is unstructured and messy for us, since we download the datasets by tiles
         and therefore we are able to run pipeline meanwhile another granule(tile) dataset is downloading.
         """
-        entries = list(self.__obj_cache['request'].values())[0]
+        entries = list(self.__obj_cache['requests'].values())[0]['entry']
         for entry in entries:
             mercator = extract_mercator(entry['title'])
             if mercator not in self.__cache:
@@ -221,12 +303,19 @@ class Downloader:
             if self.__obj_cache['polygon']:
                 # Already have full request just parse it
                 self.__parse_cached_response()
-            if url not in self.__obj_cache['request']:
-                self.__obj_cache['request'][url] = pandas.read_json(self.session.get(url).content)['feed']
+            if url not in self.__obj_cache['requests']:
+                self.__obj_cache['requests'][url] = pandas.read_json(self.session.get(url).content)['feed']
             # entry for uuid is just dict
         self.__parse_cached_response()
 
     #  Static
+
+    @staticmethod
+    def prepare_dir(path: str):
+        if is_dir_valid(path):
+            log.warning(f"Path: {path} already exists, the files in the directory will be deleted.")
+            shutil.rmtree(path)
+        os.mkdir(path)
 
     @staticmethod
     def create_polygon(polygon: List) -> Optional[Polygon]:
@@ -253,7 +342,7 @@ class Downloader:
 
     @staticmethod
     def is_valid_date_range(date: Tuple) -> bool:
-        if date is None or len(date) != 2 or (date[1] - date[0]).days > 0:
+        if date is None or len(date) != 2 or (date[1] - date[0]).days < 0:
             return False
         return True
 
