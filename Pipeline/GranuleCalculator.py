@@ -1,3 +1,4 @@
+from builtins import function
 from Pipeline.Granule import *
 from Pipeline.utils import *
 from osgeo import gdal
@@ -94,15 +95,15 @@ class GranuleCalculator:
         return _ndvi
 
     @staticmethod
-    def s2_cloud_mask(w: S2Granule) -> np.ndarray:
+    def s2_cloud_mask_scl(w: S2Granule) -> np.ndarray:
         a = w["SCL"] > 7
         b = w["SCL"] < 11
         c = w["SCL"] < 1
         return (a & b) | c
 
     @staticmethod
-    def s2_pertile_cloud_index_mask(granule: S2Granule) -> np.array:
-        arr = GranuleCalculator.s2_cloud_mask(granule)
+    def s2_pertile_cloud_index_mask(granule: S2Granule, detector: function) -> np.array:
+        arr = detector(granule)
         result = np.zeros(shape=granule.slice_index**2)
         for i in range(granule.slice_index**2):
             log.info(f"Sum: {np.sum(arr)}")

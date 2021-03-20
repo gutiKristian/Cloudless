@@ -5,7 +5,7 @@ import shutil
 from numba.typed import List as LIST
 from Pipeline.logger import log
 from Pipeline.GranuleCalculator import *
-from Pipeline.Masks import *
+from Pipeline.Mask import *
 from Pipeline.Plotting import *
 
 
@@ -59,6 +59,7 @@ class S2Worker:
             if extract_mercator(file) != self.mercator:
                 raise Exception("Tiles with different area detected")
 
+    # TODO: CHANGE TO "PUBLIC" after refactor
     def _save_result(self) -> None:
         try:
             os.mkdir(self.save_result_path)
@@ -171,7 +172,7 @@ class S2Worker:
                 # cloud_info[i] = func(w)
 
         for i, w in enumerate(self.granules, 0):
-            cloud_info[i] = func(w)
+            cloud_info[i] = func(w, GranuleCalculator.s2_cloud_mask_scl)
 
         # After iterations we hold 2D array where the y-axis stands for index of worker and
         # x-axis for the cloud percentage in the xth area of yth worker, now we just have to pick the one
