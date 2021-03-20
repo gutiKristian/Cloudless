@@ -8,10 +8,11 @@ setup(
     #   - MAJOR VERSION 0
     #   - MINOR VERSION 1
     #   - MAINTENANCE VERSION 0
-    version='0.5.0',
+    version='0.6.0',
     description='Pipeline for creating cloudless pictures from Sentinel-2 images',
     long_description=long_description,
     long_description_content_type="text/markdown",
+    setup_requires=['wheel'],
     install_requires=[
         "cycler==0.10.0",
         "kiwisolver==1.3.1",
