@@ -52,6 +52,7 @@ class Downloader:
         self.user_name = user_name
         self.password = password
         self.root_path = root_path or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.root_path = self.root_path if self.root_path[-1] == os.path.sep else self.root_path + os.path.sep
         self.session = requests.Session()
         self.session.auth = (self.user_name, self.password)
         self.polygon = None
@@ -244,7 +245,7 @@ class Downloader:
         suffix = "&rows=100&format=json"
         if self.polygon:
             self.__obj_cache['polygon'] = True
-            return [result + ' AND footprint:"Intersects(Polygon(({})))"'.format(
+            return [result + ' AND footprint:"Intersects(Polygon(({})))")'.format(
                 ",".join("{} {}".format(p[0], p[1]) for p in list(self.polygon.exterior.coords))) + suffix]
         if self.mercator_tiles:
             return [result + " AND *{}*)".format(tile) + suffix for tile in self.mercator_tiles]
@@ -321,7 +322,7 @@ class Downloader:
     def create_polygon(polygon: List) -> Optional[Polygon]:
         try:
             p = Polygon(polygon)
-            if p.is_valid():
+            if p.is_valid:
                 return p
             return None
         except Exception as _:
@@ -348,6 +349,8 @@ class Downloader:
 
     @staticmethod
     def validate_mercator_tiles(tiles: List[str]) -> List[str]:
+        if tiles is None:
+            return []
         r = re.compile("^[\d]{1,2}[A-Z]{0,3}")
         validated = []
         for entry in tiles:

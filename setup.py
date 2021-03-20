@@ -28,6 +28,7 @@ setup(
         "scikit-image==0.18.1",
         "pandas==1.2.3"
     ],
+    packages=['Pipeline', 'Download'],
     include_package_data=True,
     python_requires='>=3.7',
 )
