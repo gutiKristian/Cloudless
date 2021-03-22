@@ -15,14 +15,14 @@ class Task(ABC):
 
     @staticmethod
     @abstractmethod
-    def perform_computation(*args):
+    def perform_computation(*args) -> S2Granule:
         raise NotImplemented
 
 
 class NdviPerPixel(Task):
 
     @staticmethod
-    def perform_computation(worker: S2Worker, constraint: int = 5):
+    def perform_computation(worker: S2Worker, constraint: int = 5) -> S2Granule:
         log.info(f"Running optimised ndvi masking. Dataset {worker.main_dataset_path}")
         res_x, res_y = s2_get_resolution(worker.spatial_resolution)
         # we don't need to stack all ndvi arrays, we need just the constraint and result
@@ -65,14 +65,14 @@ class NdviPerPixel(Task):
         create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
         log.info("Done!")
         # If there's an intention to work further with the files
-        # self.result_worker = S2Granule(self.save_result_path, self.spatial_resolution, self.output_bands)
-        return 0
+        # Return result Granule
+        return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands)
 
 
 class PerTile(Task):
 
     @staticmethod
-    def perform_computation(worker: S2Worker, detector=GranuleCalculator.s2_cloud_mask_scl) -> int:
+    def perform_computation(worker: S2Worker, detector=GranuleCalculator.s2_cloud_mask_scl) -> S2Granule:
         log.info(f"Running per-tile masking. Dataset {worker.main_dataset_path}")
         # Gather information
         res_x, res_y = s2_get_resolution(worker.spatial_resolution)
@@ -89,7 +89,8 @@ class PerTile(Task):
         # Result array, where we are going to store the result intensities of pixel
         # shape -> bands, slices, x, y
         res = np.zeros(shape=(len(worker.output_bands), doy.shape[0], doy.shape[1], doy.shape[2]), dtype=np.uint16)
-        log.info(f"Initialized result array shape: {len(worker.output_bands), doy.shape[0], doy.shape[1], doy.shape[2]}")
+        log.info(
+            f"Initialized result array shape: {len(worker.output_bands), doy.shape[0], doy.shape[1], doy.shape[2]}")
         # using numpy for slicing features, could've been simple python 2D list as well
         cloud_info = np.zeros(shape=(len(worker.granules), slice_index * slice_index))
 
@@ -132,4 +133,4 @@ class PerTile(Task):
         worker._save_result()
         r, g, b = extract_rgb_paths(worker.save_result_path)
         create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
-        return 0
+        return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands)

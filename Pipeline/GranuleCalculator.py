@@ -1,7 +1,7 @@
-from builtins import function
 from Pipeline.Granule import *
 from Pipeline.utils import *
 from osgeo import gdal
+from typing import Callable
 
 
 class GranuleCalculator:
@@ -102,7 +102,7 @@ class GranuleCalculator:
         return (a & b) | c
 
     @staticmethod
-    def s2_pertile_cloud_index_mask(granule: S2Granule, detector: function) -> np.array:
+    def s2_pertile_cloud_index_mask(granule: S2Granule, detector: Callable) -> np.array:
         arr = detector(granule)
         result = np.zeros(shape=granule.slice_index**2)
         for i in range(granule.slice_index**2):

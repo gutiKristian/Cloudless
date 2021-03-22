@@ -183,3 +183,11 @@ def create_rgb_uint8(r, g, b, path, tile):
     with rasterio.open(path + os.path.sep + f"{tile}_rgb.tif", 'w', **rgb_profile) as dst:
         for count, band in enumerate([red, green, blue], 1):
             dst.write(band, count)
+
+
+def build_mosaic(paths: List[str]):
+    """
+    Build mosaic from files. Using gdal vrt.
+    @param paths - paths to tiff files
+    """
+    pass

@@ -39,6 +39,8 @@ class S2Granule:
         if self.meta_data_gdal is None:
             log.info(f"MTDMSIL2A.xml has not been found in {self.path}")
             self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
+            if len(self.paths_to_raster) == 0:
+                self.paths_to_raster = get_files_in_directory(self.path, '.tif')
             return
         log.info(f"MTDMSIL2A.xml has been found in {self.path}")
         tree = ElementTree.parse(self.meta_data_path)
@@ -72,7 +74,9 @@ class S2Granule:
         if self.spatial_resolution not in e_dict:
             e_dict[self.spatial_resolution] = {}
         for band in self.paths_to_raster:
-            key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', band)[-1]
+            key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', band)
+            if len(key) != 0:
+                key = key[-1]
             # TODO: is it necessary ?... maybe we'd like to init every available band (this should be independent from output bands)
             if key in self.desired_bands:
                 e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
