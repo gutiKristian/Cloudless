@@ -194,7 +194,7 @@ class Downloader:
             working_path = self.root_path + os.path.sep + mercator  # path where all datasets are going to be downloaded
             Downloader.prepare_dir(working_path)
             for entry in entries:
-                data_set_path = working_path + os.path.sep + entry['title'] + os.path.sep
+                data_set_path = working_path + os.path.sep + entry['title'] + ".SAFE" + os.path.sep
                 Downloader.prepare_dir(data_set_path)
                 meta_data = self.download_meta_data(Downloader.meta_url.format(entry["id"], entry["title"]),
                                                     data_set_path)
