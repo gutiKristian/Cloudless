@@ -114,14 +114,14 @@ class GranuleCalculator:
     @staticmethod
     def build_mosaics(granules: List[S2Granule], path: str, **kwargs):
         bands = {"B01", "B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B09", "B11", "B12", "AOT", "RGB", "SCL",
-                 "WVP"}
+                 "WVP", "DOY", "rgb"}
         #  Get bands that are present in every granule
         for granule in granules:
-            b = set(granule.desired_bands)
+            b = set(granule.get_initialized_bands())
             bands = bands.intersection(b)
         for band in bands:
-            paths = [g.bands[g.spatial_resolution][band] for g in granules]  # Paths to raster data
-            build_mosaic(path, paths, band + "_mosaic", **kwargs)
+            paths = [g.bands[g.spatial_resolution][band].path for g in granules]  # Paths to raster data
+            build_mosaic(path, paths, band + "_mosaic", band == "rgb", **kwargs)
 
     @staticmethod
     def info():

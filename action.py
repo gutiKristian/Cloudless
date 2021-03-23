@@ -1,6 +1,8 @@
 from joblib import Parallel, delayed
 
 from Pipeline import Worker
+from Pipeline.Granule import S2Granule
+from Pipeline.GranuleCalculator import GranuleCalculator
 from Pipeline.logger import log
 from Pipeline.utils import *
 from timeit import default_timer as timer
@@ -64,11 +66,14 @@ if __name__ == '__main__':
     # print(end - start)
     # from Pipeline import Granule
     # Granule.S2Granule("/media/xgutic/ECF1-46C6/pertile/33UUS/result/", 20, bands_for_resolution(20))
-    aa = [(16.44978919891358, 49.301000145032816), (16.424463393402544, 49.00468664741558),
-         (16.995701006596047, 49.054502687187835),
-         (17.023840790497204, 49.266123693767184), (16.44978919891358, 49.301000145032816)]
-    d = Sentinel2.Downloader('<>>', '<>>', '/home/xgutic', polygon=a,
-                             date=(datetime.datetime(2019, 5, 1), datetime.datetime(2019, 8, 1)))
-    paths = d.download_all_bands('20m')
-    for p in paths:
-        a(p)
+    # aa = [(16.44978919891358, 49.301000145032816), (16.424463393402544, 49.00468664741558),
+    #      (16.995701006596047, 49.054502687187835),
+    #      (17.023840790497204, 49.266123693767184), (16.44978919891358, 49.301000145032816)]
+    # d = Sentinel2.Downloader('kristianson12', 'kikaakiko', '/home/xgutic', polygon=aa,
+    #                          date=(datetime.datetime(2019, 5, 1), datetime.datetime(2019, 8, 1)))
+    # paths = d.download_all_bands('20m')
+    # for p in paths:
+    #     a(p)
+    g = S2Granule("/home/xgutic/dev/mosveg/temp_jobs/KRWyfMs6kW9f4frgu2rY24/T33UWR/result", 20,
+                  ["B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B11", "B12", "AOT", "SCL"])
+    GranuleCalculator.build_mosaics([g], "/home/xgutic")

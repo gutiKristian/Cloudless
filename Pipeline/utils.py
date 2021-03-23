@@ -7,6 +7,7 @@ import rasterio
 import glob
 from skimage import exposure
 from Pipeline.logger import log
+import subprocess
 
 
 # --------------- FILE UTILS ---------------
@@ -193,47 +194,27 @@ def create_rgb_uint8(r, g, b, path, tile):
             dst.write(band, count)
 
 
-def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", **kwargs) -> None:
+def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", rgb=False, **kwargs) -> None:
     """
     Build mosaic from files. Using gdal vrt.
     @param destination - path where the mosaic will be available
     @param paths - paths to tiff files
     @param name - name of the result file
-    From gdal.TranslateOptions
-        Keyword arguments are :
-          options --- can be be an array of strings, a string or let empty and filled from other keywords.
-          format --- output format ("GTiff", etc...)
-          outputType --- output type (gdalconst.GDT_Byte, etc...)
-          bandList --- array of band numbers (index start at 1)
-          maskBand --- mask band to generate or not ("none", "auto", "mask", 1, ...)
-          width --- width of the output raster in pixel
-          height --- height of the output raster in pixel
-          widthPct --- width of the output raster in percentage (100 = original width)
-          heightPct --- height of the output raster in percentage (100 = original height)
-          xRes --- output horizontal resolution
-          yRes --- output vertical resolution
-          creationOptions --- list of creation options
-          srcWin --- subwindow in pixels to extract: [left_x, top_y, width, height]
-          projWin --- subwindow in projected coordinates to extract: [ulx, uly, lrx, lry]
-          projWinSRS --- SRS in which projWin is expressed
-          strict --- strict mode
-          unscale --- unscale values with scale and offset metadata
-          scaleParams --- list of scale parameters, each of the form [src_min,src_max] or [src_min,src_max,dst_min,dst_max]
-          exponents --- list of exponentiation parameters
-          outputBounds --- assigned output bounds: [ulx, uly, lrx, lry]
-          metadataOptions --- list of metadata options
-          outputSRS --- assigned output SRS
-          nogcp --- ignore GCP in the raster
-          GCPs --- list of GCPs
-          noData --- nodata value (or "none" to unset it)
-          rgbExpand --- Color palette expansion mode: "gray", "rgb", "rgba"
-          stats --- whether to calculate statistics
-          rat --- whether to write source RAT
-          resampleAlg --- resampling mode
-          callback --- callback method
-          callback_data --- user data for callback
+    @param rgb - yep
     """
-    # destination = format_path(destination) + "mosaic.vrt"
-    final_image = destination + name + ".tif"
-    # gdal.BuildVRT(destName=destination, srcDSOrSrcDSTab=paths)
-    gdal.Translate(final_image, paths, **kwargs)
+    _destination = format_path(destination) + "mosaic.vrt"
+    final_image = format_path(destination) + name + ".tif"
+    process = subprocess.Popen(f"gdalbuildvrt -q {_destination} {' '.join(paths)}", shell=True, stdout=subprocess.PIPE)
+    process.wait()
+    #  Experiment, NOTE: TILED is making artefacts on monochromatic pictures!
+    if rgb:
+        process = subprocess.Popen(f"gdal_translate -of GTiff -co \"TILED=YES\" -co \"COMPRESS=JPEG\" -co "
+                                   f"\"PHOTOMETRIC=YCBCR\" {_destination} {final_image} -q", shell=True,
+                                   stdout=subprocess.PIPE)
+        process.wait()
+    else:
+        process = subprocess.Popen(f"gdal_translate -of GTiff -co \"TILED=YES\" {_destination} {final_image} -q",
+                                   shell=True, stdout=subprocess.PIPE)
+        process.wait()
+    process = subprocess.Popen(f"rm {_destination}", shell=True, stdout=subprocess.PIPE)
+    process.wait()

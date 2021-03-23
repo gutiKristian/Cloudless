@@ -74,12 +74,12 @@ class S2Granule:
         if self.spatial_resolution not in e_dict:
             e_dict[self.spatial_resolution] = {}
         for band in self.paths_to_raster:
-            key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL|RGB', band)
+            key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL|rgb|DOY', band)
             if len(key) != 0:
                 key = key[-1]
             # TODO: is it necessary ?... maybe we'd like to init every available band (this should be independent from output bands)
-            if key in self.desired_bands:
-                e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
+            # if key in self.desired_bands:
+            e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
         for band in self.desired_bands:
             if band not in e_dict[self.spatial_resolution]:
                 raise Exception(f"Band {band} is missing in the dataset")
@@ -148,6 +148,11 @@ class S2Granule:
             stack.append(self.bands[self.spatial_resolution][key].raster())
         log.info(f"STACK ORDER: {desired_order}")
         return np.stack(stack)
+
+    def get_initialized_bands(self) -> List[str]:
+        if len(self.bands) == 0:
+            return []
+        return [key for key in self.bands[self.spatial_resolution]]
 
     def __getitem__(self, item):
         """
