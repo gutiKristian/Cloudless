@@ -77,7 +77,7 @@ class PerTile(Task):
         log.info(f"Running per-tile masking. Dataset {worker.main_dataset_path}")
         # Gather information
         res_x, res_y = s2_get_resolution(worker.spatial_resolution)
-        slice_index = worker.granules[-1].slice_index
+        slice_index = worker.slice_index
 
         # Check if might proceed to the next step which is per-tile procedure
         for _worker in worker.granules:
