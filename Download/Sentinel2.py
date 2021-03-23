@@ -29,7 +29,8 @@ class Downloader:
     def __init__(self, user_name: str, password: str, root_path: str = None, polygon: List = None,
                  date: datetime = (datetime.datetime.now() - datetime.timedelta(days=14), datetime.datetime.now()),
                  uuid: List[str] = None, cloud_coverage: List[int] = None, product_type: str = "S2MSI2A",
-                 mercator_tiles: List[str] = None, text_search: str = None, platform_name: str = "Sentinel-2"):
+                 mercator_tiles: List[str] = None, text_search: str = None, platform_name: str = "Sentinel-2",
+                 time_str: str = None):
         """
         It is recommended to initialize object via class methods to prevent unexpected results for the user.
         Rules:
@@ -74,6 +75,7 @@ class Downloader:
         #  cached requests NOT ALL! all requests are cached after before_download is ran
         self.__obj_cache = {'requests': {}, 'polygon': False}
         self.__cache = {}
+        self.time_str = time_str
         # Check
         self.__minimum_requirements()
 
@@ -237,7 +239,8 @@ class Downloader:
         and list of urls for each tile if it is preferred method.
         """
         self.__obj_cache['cloud'] = "[{} TO {}]".format(self.cloud_coverage[0], self.cloud_coverage[1])
-        self.__obj_cache['time'] = "[" + self.date[0].strftime("%Y-%m-%d") + "T00:00:00.000Z" + " TO " + self.date[1] \
+        self.__obj_cache['time'] = self.time_str if self.time_str is not None else \
+            "[" + self.date[0].strftime("%Y-%m-%d") + "T00:00:00.000Z" + " TO " + self.date[1] \
             .strftime("%Y-%m-%d") + "T23:59:59.999Z]"
         result = self.url + "search?q=( platformname:{} AND producttype:{} AND cloudcoverpercentage:{} " \
                             "AND beginposition:{}".format(self.platform_name, self.product_type,
