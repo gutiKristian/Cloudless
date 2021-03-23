@@ -78,7 +78,7 @@ class S2Worker:
         for worker in self.granules:
             worker.load_bands(desired_bands)
 
-    def _release_bands(self):
+    def release_bands(self):
         """
         Free the memory. Set the references for the numpy arrays to None.
         """
