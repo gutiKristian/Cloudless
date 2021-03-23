@@ -66,21 +66,22 @@ class NdviPerPixel(Task):
         log.info("Done!")
         # If there's an intention to work further with the files
         # Return result Granule
-        return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands)
+        return 0
+        # return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands)
 
 
 class PerTile(Task):
 
     @staticmethod
-    def perform_computation(worker: S2Worker, detector=GranuleCalculator.s2_cloud_mask_scl) -> S2Granule:
+    def perform_computation(worker: S2Worker, detector=GranuleCalculator.s2_cloud_mask_scl) -> int:
         log.info(f"Running per-tile masking. Dataset {worker.main_dataset_path}")
         # Gather information
         res_x, res_y = s2_get_resolution(worker.spatial_resolution)
         slice_index = worker.granules[-1].slice_index
 
         # Check if might proceed to the next step which is per-tile procedure
-        for worker in worker.granules:
-            if worker.slice_index != slice_index:
+        for _worker in worker.granules:
+            if _worker.slice_index != slice_index:
                 raise Exception("Terminating job. Workers with different slice index are not allowed!")
 
         # slice_raster(slice_index, res)  # For easier assignments
@@ -133,4 +134,5 @@ class PerTile(Task):
         worker._save_result()
         r, g, b = extract_rgb_paths(worker.save_result_path)
         create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
-        return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands)
+        return 0
+        #  return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands)
