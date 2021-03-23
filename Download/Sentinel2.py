@@ -191,7 +191,7 @@ class Downloader:
             bands = bands_for_resolution(20)
 
         for mercator, entries in self.__get_next_download():
-            working_path = self.root_path + os.path.sep + mercator  # path where all datasets are going to be downloaded
+            working_path = self.root_path + mercator  # path where all datasets are going to be downloaded
             Downloader.prepare_dir(working_path)
             for entry in entries:
                 data_set_path = working_path + os.path.sep + entry['title'] + ".SAFE" + os.path.sep
@@ -201,7 +201,7 @@ class Downloader:
                 raster_urls = self.get_raster_urls(meta_data, entry, primary_spatial_res, bands)
                 for url, name in raster_urls:
                     self.download_file(url, data_set_path + name + ".jp2")
-                yield data_set_path
+            yield working_path
         log.info("All downloaded")
 
     # all_... methods download everything at once
@@ -303,7 +303,7 @@ class Downloader:
         for url in self.__obj_cache['urls']:
             if self.__obj_cache['polygon']:
                 # Already have full request just parse it
-                self.__parse_cached_response()
+                break
             if url not in self.__obj_cache['requests']:
                 self.__obj_cache['requests'][url] = pandas.read_json(self.session.get(url).content)['feed']
             # entry for uuid is just dict
