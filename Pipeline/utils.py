@@ -101,8 +101,9 @@ def is_supported_slice(index: int):
                 10 = 10x10km
                 15 =  6x6km (exactly 6.6)
                 18 =  5x5km (exactly 5.5)
+                45 =  2x2km (exactly  2.2)
     """
-    return index in [5, 10, 15, 18]
+    return index in [5, 10, 15, 18, 45]
 
 
 def find_closest_slice(index: int):

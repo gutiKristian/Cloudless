@@ -48,7 +48,7 @@ class NdviPerPixel(Task):
                 mask = (w["B02"] > 100) & (w["B04"] > 100) & (w["B8A"] > 500) & (w["B8A"] < 8000) & (w["AOT"] < 100)
                 ndvi_arrays[i] = np.ma.array(w.temp["NDVI"], mask=mask, fill_value=0).filled()
                 del mask
-                current_data.append(w.stack_bands(self.output_bands))
+                current_data.append(w.stack_bands(worker.output_bands))
                 w.free_resources()  # We have copied the resources to the new numpy array inside current_data
             S2JIT.s2_ndvi_pixel_analysis(ndvi_arrays, ndvi_result, current_data, current_doy, result, doy, res_x, res_y)
             log.debug(f"Done!")
