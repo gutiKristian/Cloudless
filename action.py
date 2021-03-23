@@ -67,7 +67,7 @@ if __name__ == '__main__':
     aa = [(16.44978919891358, 49.301000145032816), (16.424463393402544, 49.00468664741558),
          (16.995701006596047, 49.054502687187835),
          (17.023840790497204, 49.266123693767184), (16.44978919891358, 49.301000145032816)]
-    d = Sentinel2.Downloader('kristianson12', 'kikaakiko', '/home/xgutic', polygon=a,
+    d = Sentinel2.Downloader('<>>', '<>>', '/home/xgutic', polygon=a,
                              date=(datetime.datetime(2019, 5, 1), datetime.datetime(2019, 8, 1)))
     paths = d.download_all_bands('20m')
     for p in paths:
