@@ -1,6 +1,7 @@
 import os
 import re
 import numpy
+import gdal
 from typing import *
 import rasterio
 import glob
@@ -12,6 +13,12 @@ from Pipeline.logger import log
 
 def is_dir_valid(path: str) -> bool:
     return os.path.isdir(path)
+
+
+def format_path(path: str) -> str:
+    if path is None or len(path) == 0:
+        raise ValueError("Path is none or length is 0")
+    return path if path[-1] == os.path.sep else path + os.path.sep
 
 
 def is_file_valid(path: str) -> bool:
@@ -186,9 +193,47 @@ def create_rgb_uint8(r, g, b, path, tile):
             dst.write(band, count)
 
 
-def build_mosaic(paths: List[str]):
+def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", **kwargs) -> None:
     """
     Build mosaic from files. Using gdal vrt.
+    @param destination - path where the mosaic will be available
     @param paths - paths to tiff files
+    @param name - name of the result file
+    From gdal.TranslateOptions
+        Keyword arguments are :
+          options --- can be be an array of strings, a string or let empty and filled from other keywords.
+          format --- output format ("GTiff", etc...)
+          outputType --- output type (gdalconst.GDT_Byte, etc...)
+          bandList --- array of band numbers (index start at 1)
+          maskBand --- mask band to generate or not ("none", "auto", "mask", 1, ...)
+          width --- width of the output raster in pixel
+          height --- height of the output raster in pixel
+          widthPct --- width of the output raster in percentage (100 = original width)
+          heightPct --- height of the output raster in percentage (100 = original height)
+          xRes --- output horizontal resolution
+          yRes --- output vertical resolution
+          creationOptions --- list of creation options
+          srcWin --- subwindow in pixels to extract: [left_x, top_y, width, height]
+          projWin --- subwindow in projected coordinates to extract: [ulx, uly, lrx, lry]
+          projWinSRS --- SRS in which projWin is expressed
+          strict --- strict mode
+          unscale --- unscale values with scale and offset metadata
+          scaleParams --- list of scale parameters, each of the form [src_min,src_max] or [src_min,src_max,dst_min,dst_max]
+          exponents --- list of exponentiation parameters
+          outputBounds --- assigned output bounds: [ulx, uly, lrx, lry]
+          metadataOptions --- list of metadata options
+          outputSRS --- assigned output SRS
+          nogcp --- ignore GCP in the raster
+          GCPs --- list of GCPs
+          noData --- nodata value (or "none" to unset it)
+          rgbExpand --- Color palette expansion mode: "gray", "rgb", "rgba"
+          stats --- whether to calculate statistics
+          rat --- whether to write source RAT
+          resampleAlg --- resampling mode
+          callback --- callback method
+          callback_data --- user data for callback
     """
-    pass
+    # destination = format_path(destination) + "mosaic.vrt"
+    final_image = destination + name + ".tif"
+    # gdal.BuildVRT(destName=destination, srcDSOrSrcDSTab=paths)
+    gdal.Translate(final_image, paths, **kwargs)

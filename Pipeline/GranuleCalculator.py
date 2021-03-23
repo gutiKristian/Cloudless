@@ -104,12 +104,24 @@ class GranuleCalculator:
     @staticmethod
     def s2_pertile_cloud_index_mask(granule: S2Granule, detector: Callable) -> np.array:
         arr = detector(granule)
-        result = np.zeros(shape=granule.slice_index**2)
-        for i in range(granule.slice_index**2):
+        result = np.zeros(shape=granule.slice_index ** 2)
+        for i in range(granule.slice_index ** 2):
             log.info(f"Sum: {np.sum(arr)}")
             result[i] = np.sum(arr[i]) / (arr.shape[1] * arr.shape[2])
             log.info(f"Worker {granule.doy}, slice_index: {i}, cloud % : {result[i] * 100}")
         return result
+
+    @staticmethod
+    def build_mosaics(granules: List[S2Granule], path: str, **kwargs):
+        bands = {"B01", "B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B09", "B11", "B12", "AOT", "RGB", "SCL",
+                 "WVP"}
+        #  Get bands that are present in every granule
+        for granule in granules:
+            b = set(granule.desired_bands)
+            bands = bands.intersection(b)
+        for band in bands:
+            paths = [g.bands[g.spatial_resolution][band] for g in granules]  # Paths to raster data
+            build_mosaic(path, paths, band + "_mosaic", **kwargs)
 
     @staticmethod
     def info():
