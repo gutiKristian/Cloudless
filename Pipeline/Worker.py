@@ -45,6 +45,7 @@ class S2Worker:
         self.result = {}
         self.save_result_path = self.main_dataset_path + os.path.sep + "result"
         self.result_worker = None
+        self.slice_index = slice_index
         log.info(f"Initialized S2Runner:\n{self}")
 
     def get_save_path(self) -> str:
