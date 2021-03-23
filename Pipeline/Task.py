@@ -66,14 +66,13 @@ class NdviPerPixel(Task):
         log.info("Done!")
         # If there's an intention to work further with the files
         # Return result Granule
-        return 0
-        # return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands)
+        return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands)
 
 
 class PerTile(Task):
 
     @staticmethod
-    def perform_computation(worker: S2Worker, detector=GranuleCalculator.s2_cloud_mask_scl) -> int:
+    def perform_computation(worker: S2Worker, detector=GranuleCalculator.s2_cloud_mask_scl) -> S2Granule:
         log.info(f"Running per-tile masking. Dataset {worker.main_dataset_path}")
         # Gather information
         res_x, res_y = s2_get_resolution(worker.spatial_resolution)
@@ -134,5 +133,4 @@ class PerTile(Task):
         worker._save_result()
         r, g, b = extract_rgb_paths(worker.save_result_path)
         create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
-        return 0
-        #  return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands)
+        return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands)
