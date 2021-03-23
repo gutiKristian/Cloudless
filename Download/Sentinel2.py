@@ -188,7 +188,7 @@ class Downloader:
         """
         self.__before_download()
         if bands is None:
-            bands = bands_for_resolution(primary_spatial_res)
+            bands = bands_for_resolution(20)
 
         for mercator, entries in self.__get_next_download():
             working_path = self.root_path + os.path.sep + mercator  # path where all datasets are going to be downloaded
