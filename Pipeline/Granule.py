@@ -95,7 +95,7 @@ class S2Granule:
             self.doy = self.data_take.timetuple().tm_yday
             log.info("Meta data initialized.")
         except Exception as e:
-            log.warning('Opening meta data file raised an exception\n', e, "\nWorker continues without metadata file!")
+            log.warning("Worker continues without metadata file!")
 
     def get_image_resolution(self) -> Tuple[int, int]:
         if self.spatial_resolution == 10:

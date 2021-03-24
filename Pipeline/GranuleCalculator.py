@@ -106,9 +106,9 @@ class GranuleCalculator:
         arr = detector(granule)
         result = np.zeros(shape=granule.slice_index ** 2)
         for i in range(granule.slice_index ** 2):
-            log.info(f"Sum: {np.sum(arr)}")
+            log.debug(f"Sum: {np.sum(arr)}")
             result[i] = np.sum(arr[i]) / (arr.shape[1] * arr.shape[2])
-            log.info(f"Worker {granule.doy}, slice_index: {i}, cloud % : {result[i] * 100}")
+            log.debug(f"Worker {granule.doy}, slice_index: {i}, cloud % : {result[i] * 100}")
         return result
 
     @staticmethod
