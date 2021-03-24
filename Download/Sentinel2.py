@@ -16,12 +16,14 @@ from Pipeline.utils import bands_for_resolution
 import datetime
 from Pipeline.utils import extract_mercator, is_dir_valid
 from Download.DownloadExceptions import *
+from xml.dom import minidom
 
 
 # Download bands or full file option ..... bands need to be provided...
 # If bands are not present in the spatial res they are downloaded with other spat. res and resampled
 
 class Downloader:
+    manifest_url = "https://dhr1.cesnet.cz/odata/v1/Products('{}')/Nodes('{}.SAFE')/Nodes('manifest.safe')/$value"
     meta_url = "https://dhr1.cesnet.cz/odata/v1/Products('{}')/Nodes('{}.SAFE')/Nodes('MTD_MSIL2A.xml')/$value"
     raster_url = "https://dhr1.cesnet.cz/odata/v1/Products('{}')/Nodes('{}.SAFE')/Nodes('GRANULE')/" \
                  "Nodes('{}')/Nodes('IMG_DATA')/Nodes('R{}')/Nodes('{}.jp2')/$value"
@@ -83,13 +85,15 @@ class Downloader:
 
     def download_meta_data(self, url, filepath) -> str:
         """
+        FILEPATH MUST INCLUDE THE NAME OF THE FILE! FOR INSTANCE DOWNLOADING
+        THE MTD FILE -> <path>/MTD_MSIL2A.xml, DOWNLOADING THE MANIFEST FILE <path>/manifest.safe
         Downloads the meta-data MTD_MSIL2A.xml and saves it under filepath + MTD_MSIL2A.xml
         """
         response = self.session.get(url)
         if response.status_code != 200:
             raise Exception("Could not donwload the meta-data file.")
         content = response.content
-        with open(filepath + "MTD_MSIL2A.xml", 'wb') as f:
+        with open(filepath, 'wb') as f:
             f.write(content)
             f.flush()
         return response.text
@@ -97,14 +101,13 @@ class Downloader:
     def __get_group_matches(self, spatial: str, meta: str, result, bands, entry) -> set:
         pattern = re.compile(
             r'<IMAGE_FILE>GRANULE/([0-9A-Z_]+)/IMG_DATA/R{}/([0-9A-Z_]+_(.*)_{})</IMAGE_FILE>'.format(spatial,
-                                                                                                       spatial))
+                                                                                                      spatial))
         for m in re.finditer(pattern, meta):
-            print(m.group(3))
             if not len(bands.intersection({m.group(3)})) > 0:
                 continue
             bands = bands - {m.group(3)}
             result.append((Downloader.raster_url.format(entry["id"], entry["title"], m.group(1),
-                                                         spatial, m.group(2)), m.group(2)))
+                                                        spatial, m.group(2)), m.group(2)))
         return bands
 
     def get_raster_urls(self, meta, entry, spatial_res, bands):
@@ -147,7 +150,7 @@ class Downloader:
         if not check_sum:
             log.warning("Check sum not provided")
             return True
-        return hashlib.md5(path) == check_sum
+        return Downloader.calculate_md5(path) == check_sum
 
     # downloading is triggered by the user, each time he calls this method
     def download_tile_whole(self, unzip: bool = True):
@@ -191,18 +194,27 @@ class Downloader:
         self.__before_download()
         if bands is None:
             bands = bands_for_resolution(20)
-
+        status = True  # If the dataset health is ok
         for mercator, entries in self.__get_next_download():
             working_path = self.root_path + mercator  # path where all datasets are going to be downloaded
             Downloader.prepare_dir(working_path)
             for entry in entries:
                 data_set_path = working_path + os.path.sep + entry['title'] + ".SAFE" + os.path.sep
                 Downloader.prepare_dir(data_set_path)
+                manifest = self.download_meta_data(Downloader.manifest_url.format(entry["id"], entry["title"]),
+                                                   data_set_path + "manifest.safe")
+                manifest_imgs = Downloader.parse_manifest(manifest)
                 meta_data = self.download_meta_data(Downloader.meta_url.format(entry["id"], entry["title"]),
-                                                    data_set_path)
+                                                    data_set_path + "MTD_MSIL2A.xml")
                 raster_urls = self.get_raster_urls(meta_data, entry, primary_spatial_res, bands)
                 for url, name in raster_urls:
-                    self.download_file(url, data_set_path + name + ".jp2")
+                    check_sum = self.__extract_check_sum(name, manifest_imgs)
+                    status = status and self.download_file(url, data_set_path + name + ".jp2", check_sum=check_sum)
+                if not status:
+                    log.warning("Corrupted download this dataset will be discarded.")
+                    shutil.rmtree(data_set_path)
+                else:
+                    log.debug("Check sum OK!")
             yield working_path
         log.info("All downloaded")
 
@@ -224,6 +236,26 @@ class Downloader:
 
     #  Mangled
 
+    def __extract_check_sum(self, name, manifest_imgs) -> Optional[str]:
+        """
+        index and res attributes are there for backward compatibility idk why are the manifests different
+        """
+        for img in manifest_imgs:
+            try:
+                index = 1
+                res = 3
+                if len(img.childNodes) == 1:
+                    index = 0
+                    res = 1
+                if len(img.childNodes) == 0:
+                    continue
+                children = img.childNodes[index].childNodes
+                if re.search(name, children[index].attributes["href"].value):
+                    return children[res].firstChild.nodeValue
+            except Exception as _:
+                log.error("Extract check sum error...Recoverable")
+        return None
+
     def __get_next_download(self):
         """
         Traverse __cache and return meta data for mercator tiles that haven't been downloaded.
@@ -241,7 +273,7 @@ class Downloader:
         self.__obj_cache['cloud'] = "[{} TO {}]".format(self.cloud_coverage[0], self.cloud_coverage[1])
         self.__obj_cache['time'] = self.time_str if self.time_str is not None else \
             "[" + self.date[0].strftime("%Y-%m-%d") + "T00:00:00.000Z" + " TO " + self.date[1] \
-            .strftime("%Y-%m-%d") + "T23:59:59.999Z]"
+                .strftime("%Y-%m-%d") + "T23:59:59.999Z]"
         result = self.url + "search?q=( platformname:{} AND producttype:{} AND cloudcoverpercentage:{} " \
                             "AND beginposition:{}".format(self.platform_name, self.product_type,
                                                           self.__obj_cache['cloud'], self.__obj_cache['time'])
@@ -313,6 +345,33 @@ class Downloader:
         self.__parse_cached_response()
 
     #  Static
+
+    @staticmethod
+    def calculate_md5(path: str):
+        process = subprocess.Popen(f"md5sum {path}", shell=True,
+                                   stdout=subprocess.PIPE)
+        out = process.communicate()
+        if len(out) < 1:
+            return None
+        try:
+            out = out[0].decode().split(" ")[0]
+            return out
+        except Exception as _:
+            log.error("Exception during checksum parsing skipping.")
+        return None
+
+    @staticmethod
+    def parse_manifest(manifest):
+        regex = re.compile("IMG_DATA")
+        xmldom = minidom.parseString(manifest)
+        items = xmldom.getElementsByTagName('dataObject')
+        img_elements = []
+        for item in items:
+            id = item.attributes['ID'].value
+            if regex.search(id):
+                img_elements.append(item)
+        #  Items now consist of img elements where is the checksum
+        return img_elements
 
     @staticmethod
     def prepare_dir(path: str):
