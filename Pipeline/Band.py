@@ -20,7 +20,7 @@ class Band:
 
         self.path = path
         self.slice_index = slice_index
-        self._gdal = None
+        self.gdal_dataset = None
         self.raster_image = None
         self.geo_transform = None
         self.projection = None
@@ -37,9 +37,9 @@ class Band:
         if self.is_opened:
             return
         try:
-            self._gdal = gdal.Open(self.path)
-            self.projection = self._gdal.GetProjection()
-            self.geo_transform = self._gdal.GetGeoTransform()
+            self.gdal_dataset = gdal.Open(self.path)
+            self.projection = self.gdal_dataset.GetProjection()
+            self.geo_transform = self.gdal_dataset.GetGeoTransform()
             self.is_opened = True
         except Exception as e:
             raise Exception("GDAL thrown an error: ", e)
@@ -54,7 +54,7 @@ class Band:
         if not self.is_opened:
             self.init_gdal()
         self._was_raster_read = True
-        self.raster_image = self._gdal.GetRasterBand(1).ReadAsArray()
+        self.raster_image = self.gdal_dataset.GetRasterBand(1).ReadAsArray()
         if self.slice_index > 1:
             log.debug(f"Slicing raster with slice index: {self.slice_index}")
             self.raster_image = slice_raster(self.slice_index, self.raster_image)
@@ -73,11 +73,12 @@ class Band:
         """
         Delete the pointers to the data and call garbage collector to free the memory.
         """
-        del self._gdal
-        del self.raster_image
+        if self.gdal_dataset is not None:
+            self.gdal_dataset = None
+        if self.raster_image is not None:
+            self.raster_image = None
         self._was_raster_read = False
         self.is_opened = False
-        gc.collect()  # Garbage collector
 
     def __gt__(self, other: int):
         """
