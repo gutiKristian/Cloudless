@@ -70,7 +70,7 @@ class S2Worker:
         projection = list(self.granules[-1].bands[self.spatial_resolution].values())[0].projection
         geo_transform = list(self.granules[-1].bands[self.spatial_resolution].values())[0].geo_transform
         for key in self.result.keys():
-            path = self.save_result_path + "/" + key + "_" + str(self.spatial_resolution)
+            path = self.save_result_path + os.path.sep + key + "_" + str(self.spatial_resolution)
             GranuleCalculator.save_band(raster_img=self.result[key], name=key + "_" + str(self.spatial_resolution),
                                         path=path, projection=projection, geo_transform=geo_transform)
 
