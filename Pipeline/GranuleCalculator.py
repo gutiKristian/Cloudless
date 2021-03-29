@@ -3,12 +3,42 @@ from Pipeline.utils import *
 from osgeo import gdal
 from typing import Callable
 import rasterio
+import os
 from rasterio.profiles import Profile as RasterioProfile
+
+
 class GranuleCalculator:
 
     @staticmethod
-    def save_band_rast(raster: np.ndarray, name: str, path: str, dtype: type,  profile: RasterioProfile = None):
-        pass
+    def save_band_rast(raster: np.ndarray, path: str, profile: RasterioProfile = None, dtype: type = None,
+                       driver: str = None):
+        if dtype is not None:
+            profile.update(dtype=dtype)
+        if driver is not None:
+            profile.update(driver=driver)
+
+        if profile['driver'] == "JP2OpenJPEG":
+            path += '.jp2'
+        elif profile['driver'] == "GTiff":
+            path += '.tif'
+            profile.update(blockxsize=256, blockysize=256, compress='lzw')
+
+        dim = raster.ndim
+        if dim != 2 and dim != 3:
+            log.error("Raster has bad dimensions.")
+            raise ValueError
+
+        iterations = 1
+        if dim == 3:
+            iterations = len(raster)[0]
+        profile.update(count=iterations)
+
+        with rasterio.open(path, path, 'w', **profile) as dst:
+            for i in range(1, iterations + 1):
+                if dim == 3:
+                    dst.write(raster[i-1], i)
+                else:
+                    dst.write(raster, i)
 
     @staticmethod
     def save_band(raster_img, name: str, granule: S2Granule = None, path: str = None, driver: str = "GTiff",
