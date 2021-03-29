@@ -4,6 +4,8 @@ from osgeo import gdal
 from Pipeline.utils import *
 import numpy as np
 from Pipeline.logger import log
+import rasterio
+
 gdal.UseExceptions()
 
 
@@ -19,30 +21,14 @@ class Band:
             log.info("Raster is going to be sliced")
 
         self.path = path
+        self.profile = None
+        with rasterio.open(self.path) as dataset:
+            self.profile = dataset.profile
         self.slice_index = slice_index
-        self.gdal_dataset = None
         self.raster_image = None
-        self.geo_transform = None
-        self.projection = None
         self._was_raster_read = False
-        self.is_opened = False
         if load_on_init:
             self.load_raster()
-
-    def init_gdal(self) -> None:
-        """
-        This is method initializes the raster image (opens it with gdal and grabs the meta-data).
-        :return: None
-        """
-        if self.is_opened:
-            return
-        try:
-            self.gdal_dataset = gdal.Open(self.path)
-            self.projection = self.gdal_dataset.GetProjection()
-            self.geo_transform = self.gdal_dataset.GetGeoTransform()
-            self.is_opened = True
-        except Exception as e:
-            raise Exception("GDAL thrown an error: ", e)
 
     def load_raster(self) -> None:
         """
@@ -51,10 +37,9 @@ class Band:
         """
         if self._was_raster_read:
             return
-        if not self.is_opened:
-            self.init_gdal()
+        with rasterio.open(self.path) as dataset:
+            self.raster_image = dataset.read()
         self._was_raster_read = True
-        self.raster_image = self.gdal_dataset.GetRasterBand(1).ReadAsArray()
         if self.slice_index > 1:
             log.debug(f"Slicing raster with slice index: {self.slice_index}")
             self.raster_image = slice_raster(self.slice_index, self.raster_image)
@@ -73,12 +58,8 @@ class Band:
         """
         Delete the pointers to the data and call garbage collector to free the memory.
         """
-        if self.gdal_dataset is not None:
-            self.gdal_dataset = None
-        if self.raster_image is not None:
-            self.raster_image = None
+        self.raster_image = None
         self._was_raster_read = False
-        self.is_opened = False
 
     def __gt__(self, other: int):
         """
