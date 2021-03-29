@@ -10,18 +10,18 @@ from rasterio.profiles import Profile as RasterioProfile
 class GranuleCalculator:
 
     @staticmethod
-    def save_band_rast(raster: np.ndarray, path: str, profile: RasterioProfile = None, dtype: type = None,
+    def save_band_rast(raster: np.ndarray, path: str, prof: RasterioProfile = None, dtype: type = None,
                        driver: str = None):
         if dtype is not None:
-            profile.update(dtype=dtype)
+            prof.update(dtype=dtype)
         if driver is not None:
-            profile.update(driver=driver)
+            prof.update(driver=driver)
 
-        if profile['driver'] == "JP2OpenJPEG":
+        if prof['driver'] == "JP2OpenJPEG":
             path += '.jp2'
-        elif profile['driver'] == "GTiff":
+        elif prof['driver'] == "GTiff":
             path += '.tif'
-            profile.update(blockxsize=256, blockysize=256, compress='lzw')
+            prof.update(blockxsize=256, blockysize=256, compress='lzw')
 
         dim = raster.ndim
         if dim != 2 and dim != 3:
@@ -31,9 +31,9 @@ class GranuleCalculator:
         iterations = 1
         if dim == 3:
             iterations = len(raster)[0]
-        profile.update(count=iterations)
+        prof.update(count=iterations)
 
-        with rasterio.open(path, path, 'w', **profile) as dst:
+        with rasterio.open(path, 'w', **prof) as dst:
             for i in range(1, iterations + 1):
                 if dim == 3:
                     dst.write(raster[i-1], i)
