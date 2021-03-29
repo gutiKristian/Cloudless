@@ -38,7 +38,7 @@ class Band:
         if self._was_raster_read:
             return
         with rasterio.open(self.path) as dataset:
-            self.raster_image = dataset.read()
+            self.raster_image = dataset.read(1)
         self._was_raster_read = True
         if self.slice_index > 1:
             log.debug(f"Slicing raster with slice index: {self.slice_index}")
