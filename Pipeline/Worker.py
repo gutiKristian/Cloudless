@@ -75,6 +75,9 @@ class S2Worker:
                                         path=path, projection=projection, geo_transform=geo_transform)
 
     def _load_bands(self, desired_bands: List[str] = None):
+        """
+        Load each band in each granule.
+        """
         for worker in self.granules:
             worker.load_bands(desired_bands)
 
