@@ -67,6 +67,7 @@ class S2Worker:
         except FileExistsError:
             shutil.rmtree(self.save_result_path)
             os.mkdir(self.save_result_path)
+            log.warning("Result directory already exists. File will be deleted.")
         projection = list(self.granules[-1].bands[self.spatial_resolution].values())[0].projection
         geo_transform = list(self.granules[-1].bands[self.spatial_resolution].values())[0].geo_transform
         for key in self.result.keys():

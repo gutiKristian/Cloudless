@@ -2,11 +2,14 @@ from Pipeline.Granule import *
 from Pipeline.utils import *
 from osgeo import gdal
 from typing import Callable
-
-
+import rasterio
+from rasterio.profiles import Profile as RasterioProfile
 class GranuleCalculator:
 
-    #  TODO: Make worker argument optional, to generalize this method
+    @staticmethod
+    def save_band_rast(raster: np.ndarray, name: str, path: str, dtype: type,  profile: RasterioProfile = None):
+        pass
+
     @staticmethod
     def save_band(raster_img, name: str, granule: S2Granule = None, path: str = None, driver: str = "GTiff",
                   d_type: gdal.Dataset = gdal.GDT_UInt16, geo_transform: gdal.Dataset = None,
