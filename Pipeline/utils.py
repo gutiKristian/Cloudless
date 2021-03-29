@@ -188,6 +188,11 @@ def create_rgb_uint8(r, g, b, path, tile):
     rgb_profile['dtype'] = 'uint8'
     rgb_profile['count'] = 3
     rgb_profile['photometric'] = "RGB"
+    rgb_profile['driver'] = "GTiff"
+    rgb_profile['photometric'] = "YCBCR"
+    rgb_profile['compress'] = "JPEG"
+    profile['blockxsize'] = 256
+    profile['blockysize'] = 256
 
     with rasterio.open(path + os.path.sep + f"{tile}_rgb.tif", 'w', **rgb_profile) as dst:
         for count, band in enumerate([red, green, blue], 1):
