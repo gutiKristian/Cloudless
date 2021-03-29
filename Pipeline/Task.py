@@ -26,7 +26,9 @@ class NdviPerPixel(Task):
         log.info(f"Running optimised ndvi masking. Dataset {worker.main_dataset_path}")
         res_x, res_y = s2_get_resolution(worker.spatial_resolution)
         # we don't need to stack all ndvi arrays, we need just the constraint and result
-        ndvi_arrays = np.zeros(shape=(constraint, res_x, res_y), dtype=np.float)
+        ndvi_arrays = np.zeros(
+          shape=(len(worker.granules) if len(worker.granules) < constraint else constraint,res_x, res_y), dtype=np.float
+        )
         # this ndvi array serves as a holder of the current max ndvi value for this pixel
         ndvi_result = np.ones(shape=(res_x, res_y), dtype=np.float) * (-10)
         result = np.ones(shape=(len(worker.output_bands), res_x, res_y), dtype=np.uint16)
