@@ -68,12 +68,14 @@ class S2Worker:
             shutil.rmtree(self.save_result_path)
             os.mkdir(self.save_result_path)
             log.warning("Result directory already exists. File will be deleted.")
-        projection = list(self.granules[-1].bands[self.spatial_resolution].values())[0].projection
-        geo_transform = list(self.granules[-1].bands[self.spatial_resolution].values())[0].geo_transform
+        # projection = list(self.granules[-1].bands[self.spatial_resolution].values())[0].projection
+        # geo_transform = list(self.granules[-1].bands[self.spatial_resolution].values())[0].geo_transform
+        profile = list(self.granules[-1].bands[self.spatial_resolution].values())[0].profile
         for key in self.result.keys():
             path = self.save_result_path + os.path.sep + key + "_" + str(self.spatial_resolution)
-            GranuleCalculator.save_band(raster_img=self.result[key], name=key + "_" + str(self.spatial_resolution),
-                                        path=path, projection=projection, geo_transform=geo_transform)
+            GranuleCalculator.save_band_rast(self.result[key], path=path, profile=profile, driver="GTiff")
+            # GranuleCalculator.save_band(raster_img=self.result[key], name=key + "_" + str(self.spatial_resolution),
+            #                             path=path, projection=projection, geo_transform=geo_transform)
 
     def _load_bands(self, desired_bands: List[str] = None):
         """
