@@ -194,7 +194,7 @@ def create_rgb_uint8(r, g, b, path, tile):
     rgb_profile['compress'] = "JPEG"
     rgb_profile['blockxsize'] = 256
     rgb_profile['blockysize'] = 256
-
+    log.debug(f"RGB PROFILE:\n{rgb_profile}")
     with rasterio.open(path + os.path.sep + f"{tile}_rgb.tif", 'w', **rgb_profile) as dst:
         for count, band in enumerate([red, green, blue], 1):
             dst.write(band, count)
