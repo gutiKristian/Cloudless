@@ -323,6 +323,9 @@ class Downloader:
         and therefore we are able to run pipeline meanwhile another granule(tile) dataset is downloading.
         """
         entries = list(self.__obj_cache['requests'].values())[0]['entry']
+        #  If there is only one result the request contains only dict to follow the pattern we will wrap it with list
+        if type(entries) == dict:
+            entries = [entries]
         for entry in entries:
             mercator = extract_mercator(entry['title'])
             if mercator not in self.__cache:
