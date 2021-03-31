@@ -1,7 +1,6 @@
 import os
 import re
 import numpy
-import gdal
 from typing import *
 import rasterio
 import glob
