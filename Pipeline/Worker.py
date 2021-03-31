@@ -1,12 +1,7 @@
-import threading
-import time
 import shutil
-
-from numba.typed import List as LIST
 from Pipeline.logger import log
 from Pipeline.GranuleCalculator import *
-from Pipeline.Mask import *
-from Pipeline.Plotting import *
+from rasterio import dtypes as rastTypes
 
 
 class S2Worker:
@@ -75,7 +70,8 @@ class S2Worker:
         log.debug(f"Loaded from  {list(self.granules[-1].bands[self.spatial_resolution].values())[0]}")
         for key in self.result.keys():
             path = self.save_result_path + os.path.sep + key + "_" + str(self.spatial_resolution)
-            GranuleCalculator.save_band_rast(self.result[key], path=path, prof=profile, driver="GTiff")
+            GranuleCalculator.save_band_rast(self.result[key], path=path, prof=profile, driver="GTiff",
+                                             dtype=rastTypes.uint16)
             # GranuleCalculator.save_band(raster_img=self.result[key], name=key + "_" + str(self.spatial_resolution),
             #                             path=path, projection=projection, geo_transform=geo_transform)
 
