@@ -78,8 +78,8 @@ class S2Granule:
             if len(key) != 0:
                 key = key[-1]
             # TODO: is it necessary ?... maybe we'd like to init every available band (this should be independent from output bands)
-            # if key in self.desired_bands:
-            e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
+            if key in self.desired_bands:
+                e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
         for band in self.desired_bands:
             if band not in e_dict[self.spatial_resolution]:
                 raise Exception(f"Band {band} is missing in the dataset")

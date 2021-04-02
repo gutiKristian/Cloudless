@@ -1,8 +1,9 @@
 import shutil
+import gc
 from Pipeline.logger import log
 from Pipeline.GranuleCalculator import *
 from rasterio import dtypes as rastTypes
-
+from concurrent.futures import ThreadPoolExecutor
 
 class S2Worker:
 
@@ -68,10 +69,13 @@ class S2Worker:
         profile = list(self.granules[-1].bands[self.spatial_resolution].values())[0].profile
         log.debug(f"Profile: {profile}")
         log.debug(f"Loaded from  {list(self.granules[-1].bands[self.spatial_resolution].values())[0].path}")
-        for key in self.result.keys():
-            path = self.save_result_path + os.path.sep + key + "_" + str(self.spatial_resolution)
-            GranuleCalculator.save_band_rast(self.result[key], path=path, prof=profile, driver="GTiff",
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            for key in self.result.keys():
+                path = self.save_result_path + os.path.sep + key + "_" + str(self.spatial_resolution)
+                executor.submit(GranuleCalculator.save_band_rast, self.result[key], path=path, prof=profile, driver="GTiff",
                                              dtype=rastTypes.uint16)
+                # GranuleCalculator.save_band_rast(self.result[key], path=path, prof=profile, driver="GTiff",
+                #                              dtype=rastTypes.uint16)
             # GranuleCalculator.save_band(raster_img=self.result[key], name=key + "_" + str(self.spatial_resolution),
             #                             path=path, projection=projection, geo_transform=geo_transform)
 

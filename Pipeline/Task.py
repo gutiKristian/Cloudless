@@ -122,11 +122,9 @@ class PerTile(Task):
             log.info(f"Loading bands for worker with index: {value}, "
                      f"worker occupies slices - {workers_to_use[value]}")
             for sl_index in workers_to_use[value]:
-                log.info(f"Filling worker: {value} with doy: {worker.granules[value].doy} on slice index {sl_index} "
-                         f"for all available bands")
                 doy[sl_index] = worker.granules[value].doy
                 res[:, sl_index, :, :] = stack[:, sl_index, :, :]
-            del stack
+            stack = None
         worker.result["DOY"] = glue_raster(doy, res_y, res_x)
         result = np.zeros(shape=(len(worker.output_bands), res_x, res_y), dtype=np.uint16)
         for i in range(len(worker.output_bands)):

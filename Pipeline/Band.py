@@ -1,11 +1,8 @@
-import numpy as np
-import gc
 from osgeo import gdal
 from Pipeline.utils import *
 import numpy as np
 from Pipeline.logger import log
 import rasterio
-
 gdal.UseExceptions()
 
 
