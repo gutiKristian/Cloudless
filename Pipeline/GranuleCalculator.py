@@ -36,7 +36,7 @@ class GranuleCalculator:
         with rasterio.open(path, 'w', **prof) as dst:
             for i in range(1, iterations + 1):
                 if dim == 3:
-                    dst.write(raster[i-1], i)
+                    dst.write(raster[i - 1], i)
                 else:
                     dst.write(raster, i)
 
@@ -136,13 +136,19 @@ class GranuleCalculator:
 
     @staticmethod
     def s2_pertile_cloud_index_mask(granule: S2Granule, detector: Callable) -> np.array:
-        arr = detector(granule)
-        result = np.zeros(shape=granule.slice_index ** 2)
-        for i in range(granule.slice_index ** 2):
-            log.debug(f"Sum: {np.sum(arr)}")
-            result[i] = np.sum(arr[i]) / (arr.shape[1] * arr.shape[2])
-            log.debug(f"Worker {granule.doy}, slice_index: {i}, cloud % : {result[i] * 100}")
-        return result
+        log.debug(f"Worker {granule.doy}, cloud index mask.")
+        #  Compute cloud mask for each tile
+        arr = detector(granule)  # (slices, res_x, res_y)
+        #  Each index represents one tile and her cloud percentage
+        # result = np.zeros(shape=granule.slice_index ** 2)
+        shp1 = arr.shape[1]
+        shp2 = arr.shape[2]
+
+        arr = np.sum(arr, axis=(1, 2)) / (shp1 * shp2)
+        # for i in range(granule.slice_index ** 2):
+        #     result[i] = np.sum(arr[i]) / (arr.shape[1] * arr.shape[2])
+        # return result
+        return arr
 
     @staticmethod
     def build_mosaics(granules: List[S2Granule], path: str, **kwargs):
