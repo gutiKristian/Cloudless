@@ -17,8 +17,6 @@ class Band:
             if not is_supported_slice(slice_index):
                 log.warning("Unsupported slice index, choosing the closest one..")
                 slice_index = find_closest_slice(slice_index)
-                log.info(f"New slice index: {slice_index}")
-            log.info("Raster is going to be sliced")
 
         self.path = path
         self.profile = None
@@ -41,9 +39,7 @@ class Band:
             self.raster_image = dataset.read(1)
         self._was_raster_read = True
         if self.slice_index > 1:
-            log.debug(f"Slicing raster with slice index: {self.slice_index}")
             self.raster_image = slice_raster(self.slice_index, self.raster_image)
-            log.debug(f"Slicing successful, shape:({self.raster_image.shape})")
 
     def raster(self) -> np.array:
         """

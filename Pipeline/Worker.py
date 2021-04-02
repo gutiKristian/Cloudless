@@ -67,7 +67,7 @@ class S2Worker:
         # geo_transform = list(self.granules[-1].bands[self.spatial_resolution].values())[0].geo_transform
         profile = list(self.granules[-1].bands[self.spatial_resolution].values())[0].profile
         log.debug(f"Profile: {profile}")
-        log.debug(f"Loaded from  {list(self.granules[-1].bands[self.spatial_resolution].values())[0]}")
+        log.debug(f"Loaded from  {list(self.granules[-1].bands[self.spatial_resolution].values())[0].path}")
         for key in self.result.keys():
             path = self.save_result_path + os.path.sep + key + "_" + str(self.spatial_resolution)
             GranuleCalculator.save_band_rast(self.result[key], path=path, prof=profile, driver="GTiff",
