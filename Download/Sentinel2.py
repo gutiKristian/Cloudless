@@ -17,6 +17,7 @@ import datetime
 from Pipeline.utils import extract_mercator, is_dir_valid
 from Download.DownloadExceptions import *
 from xml.dom import minidom
+from concurrent.futures import ThreadPoolExecutor
 
 
 # Download bands or full file option ..... bands need to be provided...
@@ -207,9 +208,15 @@ class Downloader:
                 meta_data = self.download_meta_data(Downloader.meta_url.format(entry["id"], entry["title"]),
                                                     data_set_path + "MTD_MSIL2A.xml")
                 raster_urls = self.get_raster_urls(meta_data, entry, primary_spatial_res, bands)
-                for url, name in raster_urls:
-                    check_sum = self.__extract_check_sum(name, manifest_imgs)
-                    status = status and self.download_file(url, data_set_path + name + ".jp2", check_sum=check_sum)
+                futures = []
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    for url, name in raster_urls:
+                        check_sum = self.__extract_check_sum(name, manifest_imgs)
+                        futures.append(executor.submit(self.download_file, url, data_set_path + name + ".jp2",
+                                                       check_sum=check_sum))
+                        # status = self.download_file(url, data_set_path + name + ".jp2", check_sum=check_sum)
+                for f in futures:
+                    status = status and f.result()
                 if not status:
                     log.warning("Corrupted download this dataset will be discarded.")
                     shutil.rmtree(data_set_path)
