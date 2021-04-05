@@ -70,7 +70,7 @@ class NdviPerPixel(Task):
         worker.release_bands()
         # If there's an intention to work further with the files
         # Return result Granule
-        return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands)
+        return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands + ["rgb"])
 
 
 class PerTile(Task):
@@ -136,4 +136,4 @@ class PerTile(Task):
         r, g, b = extract_rgb_paths(worker.save_result_path)
         create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
         worker.release_bands()
-        return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands)
+        return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands + ["rgb"])
