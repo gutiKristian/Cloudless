@@ -23,7 +23,7 @@ class NdviPerPixel(Task):
 
     @staticmethod
     def perform_computation(worker: S2Worker, constraint: int = 5) -> S2Granule:
-        log.info(f"Running optimised ndvi masking. Dataset {worker.main_dataset_path}")
+        # log.info(f"Running optimised ndvi masking. Dataset {worker.main_dataset_path}")
         res_x, res_y = s2_get_resolution(worker.spatial_resolution)
         # we don't need to stack all ndvi arrays, we need just the constraint and result
         ndvi_arrays = np.zeros(
