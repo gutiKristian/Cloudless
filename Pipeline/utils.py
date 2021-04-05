@@ -223,3 +223,57 @@ def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", rgb=F
         process.wait()
     process = subprocess.Popen(f"rm {_destination}", shell=True, stdout=subprocess.PIPE)
     process.wait()
+
+
+# --------------- GRANULE UTILS ---------------
+
+def verify_bands(img_paths: List[str], found_imgs: List[str], desired_bands: List[str], spatial: int) -> List[str]:
+    # Helper function
+    def grab_imgs(p, desired, _spatial):
+        #  Check whether we would find something in this spatial res.
+        res_bands = set(bands_for_resolution(_spatial)).intersection(desired)
+        desired.difference(res_bands)
+        result = []
+        #  If not, return
+        if len(res_bands) == 0:
+            return []
+        #  Traverse images for current spatial resolution and if we find band we were looking for
+        #  add it's path to the lsit
+        for _p in p:
+            reg = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', _p)
+            if len(reg) != 0:
+                reg = reg[-1]
+            if reg in res_bands:
+                result.append(_p)
+                desired -= {reg}
+        return result
+
+    #  Current images for granule
+    found_imgs = found_imgs
+    desired_bands = set(desired_bands)
+    #  First we will check what particular bands we are missing, then we look for it
+    for found in found_imgs:
+        f = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', found)
+        if len(f) != 0:
+            f = f[-1]
+        desired_bands -= {f}
+    #  desired_bands => bands we want to find, if it's length is 0 it means we already have everything in found_imgs
+    if len(desired_bands) == 0:
+        return found_imgs
+    #  [0:7] - 10m, [7:20] - 20m, [20::] - 60m
+    if spatial != 10:
+        p = img_paths[0:7]
+        found_imgs += grab_imgs(p, desired_bands, 10)
+        if len(desired_bands) == 0:
+            return found_imgs
+    if spatial != 20:
+        p = img_paths[7:20]
+        found_imgs += grab_imgs(p, desired_bands, 20)
+        if len(desired_bands) == 0:
+            return found_imgs
+    if spatial != 60:
+        p = img_paths[20::]
+        found_imgs += grab_imgs(p, desired_bands, 60)
+        if len(desired_bands) == 0:
+            return found_imgs
+    return found_imgs
