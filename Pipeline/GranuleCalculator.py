@@ -158,8 +158,10 @@ class GranuleCalculator:
         for granule in granules:
             b = set(granule.get_initialized_bands())
             bands = bands.intersection(b)
+        log.info(f"Bands in each granule : {bands}")
         for band in bands:
             paths = [g.bands[g.spatial_resolution][band].path for g in granules]  # Paths to raster data
+            log.info(f"Band: {band}, paths: {paths}")
             build_mosaic(path, paths, band + name, band == "rgb", **kwargs)
 
     @staticmethod
