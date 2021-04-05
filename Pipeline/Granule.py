@@ -36,6 +36,13 @@ class S2Granule:
         log.info(f"Initialized worker: {self.path}\n{self}")
 
     def __find_images(self):
+        """
+        Methods tries to find images in the granule directory.
+        If meta data file is present, it grabs paths and validate if they exist.
+        Also at the end checks whether we have desired bands.
+        If meta data file is present but the paths to the raster images are incorrect, it grabs all available
+        images in the directory. The same is done if the meta data file was not provided.
+        """
         if self.meta_data_gdal is None:
             log.info(f"MTDMSIL2A.xml has not been found in {self.path}")
             self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
@@ -51,6 +58,7 @@ class S2Granule:
             if os.name == 'nt':
                 text = text.replace('/', '\\')
             images.append(self.path + os.sep + text + '.jp2')
+        #  [0:7] - 10m, [7:20] - 20m, [20::] - 60m
         if self.spatial_resolution == 10:
             self.paths_to_raster = images[0:7]
         elif self.spatial_resolution == 20:
@@ -58,8 +66,11 @@ class S2Granule:
         else:
             self.paths_to_raster = images[20::]
         if not is_file_valid(self.paths_to_raster[0]):
-            log.info("Path from meta-data file do not exist...\nChecking the directory...")
+            log.info("File found in meta-data do not exist...\nChecking the directory...")
             self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
+        else:
+            self.paths_to_raster = verify_bands(images, self.paths_to_raster,
+                                                self.desired_bands, self.spatial_resolution)
         log.info(f"Final paths to raster data {self.paths_to_raster}")
 
     def __to_band_dictionary(self) -> dict:
@@ -68,7 +79,7 @@ class S2Granule:
         """
         log.info("Creating bands from raster paths...")
         if not self.paths_to_raster or len(self.paths_to_raster) == 0:
-            return {}
+            raise FileNotFoundError("Images not present")
         e_dict = dict()  # create new dictionary
         # spatial_res = int(re.findall(r'\d+', array[0])[-1])
         if self.spatial_resolution not in e_dict:
@@ -77,9 +88,13 @@ class S2Granule:
             key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL|rgb|DOY', band)
             if len(key) != 0:
                 key = key[-1]
-            # TODO: is it necessary ?... maybe we'd like to init every available band (this should be independent from output bands)
+            # TODO: is it necessary ?... maybe we'd like to init every available band (this should be independent
+            #  from output bands)
             if key in self.desired_bands:
-                e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
+                b = Band(band, slice_index=self.slice_index)
+                if b.profile["width"] != s2_get_resolution(self.spatial_resolution)[0]:
+                    b.resample(2, delete=True)
+                e_dict[self.spatial_resolution][key] = b
         for band in self.desired_bands:
             if band not in e_dict[self.spatial_resolution]:
                 raise Exception(f"Band {band} is missing in the dataset")
