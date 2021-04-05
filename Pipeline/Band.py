@@ -3,8 +3,9 @@ from Pipeline.utils import *
 import numpy as np
 from Pipeline.logger import log
 import rasterio
-gdal.UseExceptions()
+from rasterio import Affine, MemoryFile
 
+gdal.UseExceptions()
 
 class Band:
     def __init__(self, path: str, load_on_init: bool = False, slice_index: int = 1):
@@ -46,6 +47,38 @@ class Band:
             return self.raster_image
         self.load_raster()
         return self.raster_image
+
+    def resample(self, sample_factor, delete=False):
+        transform = None
+        width = 0
+        height = 0
+        data = None
+        with rasterio.open(self.path, "r") as dataset:
+            # resample data to target shape
+            data = dataset.read(
+                out_shape=(
+                    dataset.count,
+                    int(dataset.height * sample_factor),
+                    int(dataset.width * sample_factor)
+                ),
+                resampling=rasterio.enums.Resampling.bilinear
+            )
+            height = dataset.height * sample_factor
+            width = dataset.width * sample_factor
+            # scale image transform
+            transform = dataset.transform * dataset.transform.scale(
+                (dataset.width / data.shape[-1]),
+                (dataset.height / data.shape[-2])
+            )
+            self.profile = dataset.profile
+        _, ext = os.path.splitext(self.path)
+        self.profile.update(transform=transform, width=width, height=height)
+        with rasterio.open(self.path + "_res" + ext, 'w', **self.profile) as dataset:
+            for i in range(dataset.count):
+                dataset.write(data[i], i + 1)
+        if delete:
+            os.remove(self.path)
+        self.path = self.path + "_res" + ext
 
     def free_resources(self) -> None:
         """
