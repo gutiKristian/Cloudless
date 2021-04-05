@@ -5,6 +5,7 @@ from Pipeline.GranuleCalculator import *
 from rasterio import dtypes as rastTypes
 from concurrent.futures import ThreadPoolExecutor
 
+
 class S2Worker:
 
     def __init__(self, path: str, spatial_resolution: int, slice_index: int = 1, output_bands: List[str] = []):
@@ -30,13 +31,21 @@ class S2Worker:
         self.main_dataset_path = path
         #  Supported spatial resolutions for sentinel 2 are 10m,20m and 60m
         self.spatial_resolution = spatial_resolution
-        self.mercator = extract_mercator(path)  # TODO: CHECK THIS
+        self.mercator = extract_mercator(path)
         #  Datasets in SAFE format
         self.datasets = get_subdirectories(path)
         self._validate_files_by_mercator()
         # Initialize granules
-        self.granules = [S2Granule(_path, spatial_resolution, self.output_bands, slice_index) for _path in self.datasets
-                         if s2_is_safe_format(_path)]
+        self.granules = []
+        for _path in self.datasets:
+            try:
+                if s2_is_safe_format(_path):
+                    gr = S2Granule(_path, spatial_resolution, self.output_bands, slice_index)
+                    self.granules.append(gr)
+            except Exception as _:
+                log.error(f"Did not find raster dataset in {_path}")
+        if len(self.granules) == 0:
+            raise Exception("Initialization failed")
         #  The result of masking is stored in this variable, "B01": numpy.array, etc.
         self.result = {}
         self.save_result_path = self.main_dataset_path + os.path.sep + "result"
@@ -72,8 +81,9 @@ class S2Worker:
         with ThreadPoolExecutor(max_workers=10) as executor:
             for key in self.result.keys():
                 path = self.save_result_path + os.path.sep + key + "_" + str(self.spatial_resolution)
-                executor.submit(GranuleCalculator.save_band_rast, self.result[key], path=path, prof=profile, driver="GTiff",
-                                             dtype=rastTypes.uint16)
+                executor.submit(GranuleCalculator.save_band_rast, self.result[key], path=path, prof=profile,
+                                driver="GTiff",
+                                dtype=rastTypes.uint16)
                 # GranuleCalculator.save_band_rast(self.result[key], path=path, prof=profile, driver="GTiff",
                 #                              dtype=rastTypes.uint16)
             # GranuleCalculator.save_band(raster_img=self.result[key], name=key + "_" + str(self.spatial_resolution),
