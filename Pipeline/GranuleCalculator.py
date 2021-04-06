@@ -122,10 +122,34 @@ class GranuleCalculator:
         granule.temp["NDVI"] = _ndvi
         if not save:
             return _ndvi
-        GranuleCalculator.save_band(granule=granule, raster_img=_ndvi, geo_transform=granule['B04'].geotransform,
-                                    projection=granule['B04'].projection)
+        GranuleCalculator.save_band_rast(_ndvi, path=granule.path, prof=granule['B8A'].profile,
+                                         dtype=np.float, driver="GTiff")
         del nir, red
         return _ndvi
+
+    @staticmethod
+    def ari1(granule: S2Granule, save: bool = False):
+        """
+        ARI - Anthocyanin Reflectance Index
+        Anthocyanins are pigments common in higher plants, causing their red, blue and purple coloration.
+        They provide valuable information about the physiological status of plants,
+        as they are considered indicators of various types of plant stresses.
+
+        The reflectance of anthocyanin is highest around 550nm. However, the same wavelengths are reflected by
+        chlorophyll as well. To isolate the anthocyanins, the 700nm spectral band, that reflects only chlorophyll and
+        not anthocyanins, is subtracted.
+        """
+        if granule is None or granule["B03"] is None or granule["B05"] is None:
+            raise ValueError("granule is none")
+        b03 = 1 / granule["B03"].raster().astype(float)
+        b05 = 1 / granule["B05"].raster().astype(float)
+        ari1 = b03 - b05
+        granule.temp["ARI1"] = ari1
+        if not save:
+            return ari1
+        GranuleCalculator.save_band_rast(ari1, path=granule.path, prof=granule["B03"].profile,
+                                         dtype=np.float, driver="GTiff")
+        return ari1
 
     @staticmethod
     def s2_cloud_mask_scl(w: S2Granule) -> np.ndarray:
@@ -151,7 +175,7 @@ class GranuleCalculator:
         return arr
 
     @staticmethod
-    def build_mosaics(granules: List[S2Granule], path: str, name: str = "_mosaic",  **kwargs):
+    def build_mosaics(granules: List[S2Granule], path: str, name: str = "_mosaic", **kwargs):
         bands = {"B01", "B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B09", "B11", "B12", "AOT", "RGB", "SCL",
                  "WVP", "DOY", "rgb"}
         #  Get bands that are present in every granule
