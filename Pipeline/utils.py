@@ -209,19 +209,20 @@ def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", rgb=F
     """
     _destination = format_path(destination) + "mosaic.vrt"
     final_image = format_path(destination) + name + ".tif"
-    process = subprocess.Popen(f"gdalbuildvrt -q {_destination} {' '.join(paths)}", shell=True, stdout=subprocess.PIPE)
+    escaped_paths = " ".join(f'"{p}"' for p in paths)
+    process = subprocess.Popen(f"gdalbuildvrt -q \"{_destination}\" {escaped_paths}", shell=True, stdout=subprocess.PIPE)
     process.wait()
     #  Experiment, NOTE: TILED is making artefacts on monochromatic pictures!
     if rgb:
         process = subprocess.Popen(f"gdal_translate -of GTiff -co \"TILED=YES\" -co \"COMPRESS=JPEG\" -co "
-                                   f"\"PHOTOMETRIC=YCBCR\" {_destination} {final_image} -q", shell=True,
+                                   f"\"PHOTOMETRIC=YCBCR\" \"{_destination}\" \"{final_image}\" -q", shell=True,
                                    stdout=subprocess.PIPE)
         process.wait()
     else:
-        process = subprocess.Popen(f"gdal_translate -of GTiff -co \"TILED=YES\" {_destination} {final_image} -q",
+        process = subprocess.Popen(f"gdal_translate -of GTiff -co \"TILED=YES\" \"{_destination}\" \"{final_image}\" -q",
                                    shell=True, stdout=subprocess.PIPE)
         process.wait()
-    process = subprocess.Popen(f"rm {_destination}", shell=True, stdout=subprocess.PIPE)
+    process = subprocess.Popen(f"rm \"{_destination}\"", shell=True, stdout=subprocess.PIPE)
     process.wait()
 
 
