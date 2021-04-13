@@ -239,7 +239,7 @@ def verify_bands(img_paths: List[str], found_imgs: List[str], desired_bands: Lis
         if len(res_bands) == 0:
             return []
         #  Traverse images for current spatial resolution and if we find band we were looking for
-        #  add it's path to the lsit
+        #  add it's path to the list
         for _p in p:
             reg = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', _p)
             if len(reg) != 0:
