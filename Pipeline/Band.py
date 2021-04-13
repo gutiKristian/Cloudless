@@ -1,11 +1,16 @@
+import shutil
+
 from osgeo import gdal
 from Pipeline.utils import *
 import numpy as np
 from Pipeline.logger import log
 import rasterio
 from rasterio import Affine, MemoryFile
+from rasterio.warp import calculate_default_transform, reproject
+import subprocess
 
 gdal.UseExceptions()
+
 
 class Band:
     def __init__(self, path: str, load_on_init: bool = False, slice_index: int = 1):
@@ -47,6 +52,40 @@ class Band:
             return self.raster_image
         self.load_raster()
         return self.raster_image
+
+    def band_reproject(self, t_srs='EPSG:32633', delete=True):
+        """
+        Reproject band to the given band to the other UTM zone.
+        @param t_srs: target srs
+        @param delete: delete source file after the reprojection
+        """
+        # GDAL version
+        # process = subprocess.Popen(f"gdalwarp \"{self.path}\" -s_srs  -t_srs {t_srs} -co TILED=TRUE \"{new_path}\" ")
+        # process.wait()
+        # rasterio version
+        new_path, _ = os.path.splitext(self.path)
+        new_path += '.tif'
+        with rasterio.open(self.path) as src:
+            transform, width, height = calculate_default_transform(src.crs, t_srs, src.width, src.height, *src.bounds)
+            kwargs = src.meta.copy()
+            kwargs.update({
+                'crs': t_srs,
+                'transform': transform,
+                'width': width,
+                'height': height
+            })
+            with rasterio.open(new_path, 'w', **kwargs) as dst:
+                for i in range(1, src.count + 1):
+                    reproject(
+                        source=rasterio.band(src, i),
+                        destination=rasterio.band(dst, i),
+                        src_transform=src.transform,
+                        src_crs=src.crs,
+                        dst_transform=transform,
+                        dst_crs=t_srs)
+        if delete:
+            shutil.rmtree(self.path)
+        self.path = new_path
 
     def resample(self, sample_factor, delete=False):
         transform = None
