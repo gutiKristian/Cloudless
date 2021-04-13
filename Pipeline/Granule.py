@@ -9,16 +9,14 @@ gdal.UseExceptions()
 
 
 class S2Granule:
-    """
-    This class can be instantiated only inside S2Worker.
-    """
 
-    def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1):
+    def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1, t_srs: str = 'EPSG:32633'):
         if not is_dir_valid(path):
             raise FileNotFoundError("Dataset has not been found !")
         self.path = path
         self.spatial_resolution = spatial_res
         self.desired_bands = desired_bands
+        self.t_srs = t_srs
         self.meta_data_path = self.path + os.path.sep + "MTD_MSIL2A.xml"
         self.meta_data_gdal = None
         self.meta_data = None
@@ -77,8 +75,8 @@ class S2Granule:
         """
         Match list of paths of bands to dictionary for better access.
         """
-        log.info("Creating bands from raster paths...")
         if not self.paths_to_raster or len(self.paths_to_raster) == 0:
+            log.error(f"Raster images not present in {self.path}")
             raise FileNotFoundError("Images not present")
         e_dict = dict()  # create new dictionary
         # spatial_res = int(re.findall(r'\d+', array[0])[-1])
@@ -93,7 +91,9 @@ class S2Granule:
             if key in self.desired_bands:
                 b = Band(band, slice_index=self.slice_index)
                 if b.profile["width"] != s2_get_resolution(self.spatial_resolution)[0]:
-                    b.resample(2, delete=True)
+                    b.resample(s2_get_resolution(self.spatial_resolution)[0] / b.profile["width"], delete=True)
+                if b.profile["crs"] != self.t_srs:
+                    b.band_reproject(self.t_srs)
                 e_dict[self.spatial_resolution][key] = b
         for band in self.desired_bands:
             if band not in e_dict[self.spatial_resolution]:

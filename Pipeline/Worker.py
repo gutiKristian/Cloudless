@@ -8,7 +8,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 class S2Worker:
 
-    def __init__(self, path: str, spatial_resolution: int, slice_index: int = 1, output_bands: List[str] = []):
+    def __init__(self, path: str, spatial_resolution: int, slice_index: int = 1, output_bands: List[str] = [],
+                 target_projection='EPSG:32633'):
         """
         :param path: to the dataset
         :param spatial_resolution: on which we are going to operate on
@@ -40,7 +41,7 @@ class S2Worker:
         for _path in self.datasets:
             try:
                 if s2_is_safe_format(_path):
-                    gr = S2Granule(_path, spatial_resolution, self.output_bands, slice_index)
+                    gr = S2Granule(_path, spatial_resolution, self.output_bands, slice_index, target_projection)
                     self.granules.append(gr)
             except Exception as _:
                 log.error(f"Did not find raster dataset in {_path}")
@@ -51,6 +52,7 @@ class S2Worker:
         self.save_result_path = self.main_dataset_path + os.path.sep + "result"
         self.result_worker = None
         self.slice_index = slice_index
+        self.t_srs = target_projection
         log.info(f"Initialized S2Runner:\n{self}")
 
     def get_save_path(self) -> str:
