@@ -8,7 +8,7 @@ setup(
     #   - MAJOR VERSION 0
     #   - MINOR VERSION 1
     #   - MAINTENANCE VERSION 0
-    version='0.8.5',
+    version='0.8.9',
     description='Pipeline for creating cloudless pictures from Sentinel-2 images',
     long_description=long_description,
     long_description_content_type="text/markdown",
