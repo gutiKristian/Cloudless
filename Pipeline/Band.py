@@ -59,32 +59,33 @@ class Band:
         @param t_srs: target srs
         @param delete: delete source file after the reprojection
         """
-        # GDAL version
-        # process = subprocess.Popen(f"gdalwarp \"{self.path}\" -s_srs  -t_srs {t_srs} -co TILED=TRUE \"{new_path}\" ")
-        # process.wait()
         # rasterio version
         new_path, _ = os.path.splitext(self.path)
         new_path += '.tif'
-        with rasterio.open(self.path) as src:
-            transform, width, height = calculate_default_transform(src.crs, t_srs, src.width, src.height, *src.bounds)
-            kwargs = src.meta.copy()
-            kwargs.update({
-                'crs': t_srs,
-                'transform': transform,
-                'width': width,
-                'height': height
-            })
-            with rasterio.open(new_path, 'w', **kwargs) as dst:
-                for i in range(1, src.count + 1):
-                    reproject(
-                        source=rasterio.band(src, i),
-                        destination=rasterio.band(dst, i),
-                        src_transform=src.transform,
-                        src_crs=src.crs,
-                        dst_transform=transform,
-                        dst_crs=t_srs)
+        # GDAL version
+        process = subprocess.Popen(f"gdalwarp \"{self.path}\" -s_srs {self.profile['crs']} -t_srs {t_srs} \"{new_path}\"",
+                                   shell=True)
+        process.wait()
+        # with rasterio.open(self.path) as src:
+        #     transform, width, height = calculate_default_transform(src.crs, t_srs, src.width, src.height, *src.bounds)
+        #     kwargs = src.meta.copy()
+        #     kwargs.update({
+        #         'crs': t_srs,
+        #         'transform': transform,
+        #         'width': width,
+        #         'height': height
+        #     })
+        #     with rasterio.open(new_path, 'w', **kwargs) as dst:
+        #         for i in range(1, src.count + 1):
+        #             reproject(
+        #                 source=rasterio.band(src, i),
+        #                 destination=rasterio.band(dst, i),
+        #                 src_transform=src.transform,
+        #                 src_crs=src.crs,
+        #                 dst_transform=transform,
+        #                 dst_crs=t_srs)
         if delete:
-            shutil.rmtree(self.path)
+            os.remove(self.path)
         self.path = new_path
 
     def resample(self, sample_factor, delete=False):
