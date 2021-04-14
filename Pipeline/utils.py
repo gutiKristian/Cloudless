@@ -193,6 +193,7 @@ def create_rgb_uint8(r, g, b, path, tile):
     rgb_profile['compress'] = "JPEG"
     rgb_profile['blockxsize'] = 256
     rgb_profile['blockysize'] = 256
+    rgb_profile['nodata'] = 0
     log.debug(f"RGB PROFILE:\n{rgb_profile}")
     with rasterio.open(path + os.path.sep + f"{tile}_rgb.tif", 'w', **rgb_profile) as dst:
         for count, band in enumerate([red, green, blue], 1):
@@ -214,7 +215,8 @@ def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", rgb=F
     process.wait()
     #  Experiment, NOTE: TILED is making artefacts on monochromatic pictures!
     if rgb:
-        process = subprocess.Popen(f"gdal_translate -of GTiff -co \"TILED=YES\" -co \"COMPRESS=JPEG\" -co "
+        process = subprocess.Popen(f"gdal_translate -of GTiff srcnodata 0 -dstnodata none -dstalpha -co \"TILED=YES\" "
+                                   f"-co \"COMPRESS=JPEG\" -co "
                                    f"\"PHOTOMETRIC=YCBCR\" \"{_destination}\" \"{final_image}\" -q", shell=True,
                                    stdout=subprocess.PIPE)
         process.wait()
