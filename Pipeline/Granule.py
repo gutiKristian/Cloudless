@@ -93,7 +93,7 @@ class S2Granule:
                 if b.profile["width"] != s2_get_resolution(self.spatial_resolution)[0]:
                     b.resample(s2_get_resolution(self.spatial_resolution)[0] / b.profile["width"], delete=True)
                 if b.profile["crs"] != self.t_srs:
-                    b.band_reproject(self.t_srs)
+                    b.band_reproject(self.t_srs)  # TODO UPDATE self.paths to raster
                 e_dict[self.spatial_resolution][key] = b
         for band in self.desired_bands:
             if band not in e_dict[self.spatial_resolution]:
