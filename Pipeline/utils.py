@@ -7,6 +7,7 @@ import glob
 from skimage import exposure
 from Pipeline.logger import log
 import subprocess
+from rasterio.enums import Resampling
 
 
 # --------------- FILE UTILS ---------------
@@ -198,6 +199,9 @@ def create_rgb_uint8(r, g, b, path, tile):
     with rasterio.open(path + os.path.sep + f"{tile}_rgb.tif", 'w', **rgb_profile) as dst:
         for count, band in enumerate([red, green, blue], 1):
             dst.write(band, count)
+        dst.build_overviews([2, 4, 8, 16, 32], Resampling.nearest)
+        dst.update_tags(ns='rio_overview', resampling='nearest')
+
 
 
 def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", rgb=False, **kwargs) -> None:
