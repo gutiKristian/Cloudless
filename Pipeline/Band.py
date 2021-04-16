@@ -88,6 +88,8 @@ class Band:
         if delete:
             os.remove(self.path)
         self.path = new_path
+        with rasterio.open(self.path) as dataset:
+            self.profile = dataset.profile
 
     def resample(self, sample_factor, delete=False):
         transform = None
