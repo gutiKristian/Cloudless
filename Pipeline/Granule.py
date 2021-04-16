@@ -168,7 +168,7 @@ class S2Granule:
         return [key for key in self.bands[self.spatial_resolution]]
 
     def get_projection(self):
-        return list(self.bands[self.spatial_resolution].values())[-1]
+        return list(self.bands[self.spatial_resolution].values())[-1].profile["crs"]
 
     def reproject_bands(self, target_projection: str):
         for band in self.bands[self.spatial_resolution].values():
