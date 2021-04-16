@@ -219,7 +219,7 @@ def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", rgb=F
     process.wait()
     #  Experiment, NOTE: TILED is making artefacts on monochromatic pictures!
     if rgb:
-        process = subprocess.Popen(f"gdal_translate -of GTiff srcnodata 0 -dstnodata none -dstalpha -co \"TILED=YES\" "
+        process = subprocess.Popen(f"gdal_translate -of GTiff --config GDAL_CACHE_MAX 128 -co \"TILED=YES\" "
                                    f"-co \"COMPRESS=JPEG\" -co "
                                    f"\"PHOTOMETRIC=YCBCR\" \"{_destination}\" \"{final_image}\" -q", shell=True,
                                    stdout=subprocess.PIPE)
