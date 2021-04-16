@@ -56,6 +56,7 @@ class Band:
     def band_reproject(self, t_srs='EPSG:32633', delete=True):
         """
         Reproject band to the given band to the other UTM zone.
+        REPROJECTION SHOULD BE DONE AFTER THE PIPELINE BECAUSE REPROJECTION MIGHT CHANGE THE RESOLUTION OF RASTER.
         @param t_srs: target srs
         @param delete: delete source file after the reprojection
         """

@@ -92,8 +92,6 @@ class S2Granule:
                 b = Band(band, slice_index=self.slice_index)
                 if b.profile["width"] != s2_get_resolution(self.spatial_resolution)[0]:
                     b.resample(s2_get_resolution(self.spatial_resolution)[0] / b.profile["width"], delete=True)
-                # if b.profile["crs"] != self.t_srs:
-                #     b.band_reproject(self.t_srs)  # TODO UPDATE self.paths to raster
                 e_dict[self.spatial_resolution][key] = b
         for band in self.desired_bands:
             if band not in e_dict[self.spatial_resolution]:
@@ -168,6 +166,13 @@ class S2Granule:
         if len(self.bands) == 0:
             return []
         return [key for key in self.bands[self.spatial_resolution]]
+
+    def get_projection(self):
+        return list(self.bands[self.spatial_resolution].values())[-1]
+
+    def reproject_bands(self, target_projection: str):
+        for band in self.bands[self.spatial_resolution].values():
+            band.band_reproject(t_srs=target_projection)
 
     def __getitem__(self, item):
         """
