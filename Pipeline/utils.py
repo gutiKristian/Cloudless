@@ -116,7 +116,7 @@ def is_supported_slice(index: int):
 
 def find_closest_slice(index: int):
     current_index = 0
-    arr = [5, 10, 15, 18]
+    arr = [5, 10, 15, 18, 45]
     _x = 10000
     for i in range(len(arr)):
         x = abs(index - arr[i])
