@@ -1,0 +1,25 @@
+image: "python:3.7"
+
+before_script:
+  - python --version
+  - pip install -r requirements.txt
+
+stages:
+  - Static Analysis
+  - Test
+
+flake8:
+  stage: Static Analysis
+  allow_failure: true
+  script:
+  - flake8 --max-line-length=120 Pipeline/*.py
+  - flake8 --max-line-length=120 Download/*.py
+
+pytest:
+  stage: Test
+  script:
+  - pwd
+  - ls -l
+  - export PYTHONPATH="$PYTHONPATH:."
+  - python -c "import sys;print(sys.path)"
+  - pytest Pipeline/test.py
