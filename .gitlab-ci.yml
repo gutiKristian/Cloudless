@@ -16,15 +16,7 @@ before_script:
 
 
 stages:
-  - Static Analysis
   - Test
-
-flake8:
-  stage: Static Analysis
-  allow_failure: true
-  script:
-  - flake8 --max-line-length=120 Pipeline/*.py
-  - flake8 --max-line-length=120 Download/*.py
 
 pytest:
   stage: Test
