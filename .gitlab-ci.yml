@@ -3,6 +3,11 @@ image: "python:3.7"
 before_script:
   - python --version
   - pip install -r requirements.txt
+  - apt-get install gdal-bin
+  - apt-get install libgdal-dev
+  - export CPLUS_INCLUDE_PATH=/usr/include/gdal
+  - export C_INCLUDE_PATH=/usr/include/
+
 
 stages:
   - Static Analysis

@@ -11,3 +11,5 @@ Shapely==1.7.1
 six==1.15.0
 pytest==6.2.3
 flake8==3.9.1
+GDAL==3.0.4
+rasterio==1.1.8
