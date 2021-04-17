@@ -2,11 +2,13 @@ image: "python:3.7"
 
 before_script:
   - python --version
-  - pip install -r requirements.txt
   - apt-get install gdal-bin
   - apt-get install libgdal-dev
+  - apt-get install python3-gdal
   - export CPLUS_INCLUDE_PATH=/usr/include/gdal
   - export C_INCLUDE_PATH=/usr/include/
+  - pip install numpy==1.19.4
+  - pip install -r requirements.txt
 
 
 stages:
