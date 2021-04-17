@@ -2,10 +2,10 @@ image: "python:3.7"
 
 before_script:
   - python --version
-  - apt-get update
-  - apt-get install gdal-bin
-  - apt-get install libgdal-dev
-  - apt-get install python3-gdal
+  - apt-get update -y
+  - apt-get install gdal-bin -y
+  - apt-get install libgdal-dev -y
+  - apt-get install python3-gdal -y
   - export CPLUS_INCLUDE_PATH=/usr/include/gdal
   - export C_INCLUDE_PATH=/usr/include/
   - pip install numpy==1.19.4
