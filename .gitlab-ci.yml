@@ -1,0 +1,24 @@
+image: "python:3.7"
+
+before_script:
+  - python --version
+  - apt-get update -y
+  - apt-get install build-essential -y
+  - apt-get install gdal-bin -y
+  - apt-get install libgdal-dev -y
+  - apt-get install python3-gdal -y
+  - export CPLUS_INCLUDE_PATH=/usr/include/gdal
+  - export C_INCLUDE_PATH=/usr/include/
+  - pip install numpy==1.19.4
+  - pip install GDAL=="`gdal-config --version`"
+  - pip install wheel
+  - pip install -r requirements.txt
+
+
+stages:
+  - Test
+
+pytest:
+  stage: Test
+  script:
+  - python -m pytest Pipeline/test.py

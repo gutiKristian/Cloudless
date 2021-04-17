@@ -6,12 +6,20 @@ import rasterio
 import glob
 from skimage import exposure
 from Pipeline.logger import log
+import subprocess
+from rasterio.enums import Resampling
 
 
 # --------------- FILE UTILS ---------------
 
 def is_dir_valid(path: str) -> bool:
     return os.path.isdir(path)
+
+
+def format_path(path: str) -> str:
+    if path is None or len(path) == 0:
+        raise ValueError("Path is none or length is 0")
+    return path if path[-1] == os.path.sep else path + os.path.sep
 
 
 def is_file_valid(path: str) -> bool:
@@ -101,13 +109,14 @@ def is_supported_slice(index: int):
                 10 = 10x10km
                 15 =  6x6km (exactly 6.6)
                 18 =  5x5km (exactly 5.5)
+                45 =  2x2km (exactly  2.2)
     """
-    return index in [5, 10, 15, 18]
+    return index in [5, 10, 15, 18, 45]
 
 
 def find_closest_slice(index: int):
     current_index = 0
-    arr = [5, 10, 15, 18]
+    arr = [5, 10, 15, 18, 45]
     _x = 10000
     for i in range(len(arr)):
         x = abs(index - arr[i])
@@ -179,7 +188,99 @@ def create_rgb_uint8(r, g, b, path, tile):
     rgb_profile['dtype'] = 'uint8'
     rgb_profile['count'] = 3
     rgb_profile['photometric'] = "RGB"
-
+    rgb_profile['driver'] = "GTiff"
+    rgb_profile['interleave'] = "PIXEL"
+    rgb_profile['photometric'] = "YCBCR"
+    rgb_profile['compress'] = "JPEG"
+    rgb_profile['blockxsize'] = 256
+    rgb_profile['blockysize'] = 256
+    rgb_profile['nodata'] = 0
+    log.debug(f"RGB PROFILE:\n{rgb_profile}")
     with rasterio.open(path + os.path.sep + f"{tile}_rgb.tif", 'w', **rgb_profile) as dst:
         for count, band in enumerate([red, green, blue], 1):
             dst.write(band, count)
+        dst.build_overviews([2, 4, 8, 16, 32], Resampling.nearest)
+        dst.update_tags(ns='rio_overview', resampling='nearest')
+
+
+
+def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", rgb=False, **kwargs) -> None:
+    """
+    Build mosaic from files. Using gdal vrt.
+    @param destination - path where the mosaic will be available
+    @param paths - paths to tiff files
+    @param name - name of the result file
+    @param rgb - yep
+    """
+    _destination = format_path(destination) + "mosaic.vrt"
+    final_image = format_path(destination) + name + ".tif"
+    escaped_paths = " ".join(f'"{p}"' for p in paths)
+    process = subprocess.Popen(f"gdalbuildvrt -q \"{_destination}\" {escaped_paths}", shell=True, stdout=subprocess.PIPE)
+    process.wait()
+    #  Experiment, NOTE: TILED is making artefacts on monochromatic pictures!
+    if rgb:
+        process = subprocess.Popen(f"gdal_translate -of GTiff --config GDAL_CACHE_MAX 128 -co \"TILED=YES\" "
+                                   f"-co \"COMPRESS=JPEG\" -co "
+                                   f"\"PHOTOMETRIC=YCBCR\" \"{_destination}\" \"{final_image}\" -q", shell=True,
+                                   stdout=subprocess.PIPE)
+        process.wait()
+    else:
+        process = subprocess.Popen(f"gdal_translate -of GTiff -co \"TILED=YES\" \"{_destination}\" \"{final_image}\" -q",
+                                   shell=True, stdout=subprocess.PIPE)
+        process.wait()
+    process = subprocess.Popen(f"rm \"{_destination}\"", shell=True, stdout=subprocess.PIPE)
+    process.wait()
+
+
+# --------------- GRANULE UTILS ---------------
+
+def verify_bands(img_paths: List[str], found_imgs: List[str], desired_bands: List[str], spatial: int) -> List[str]:
+    # Helper function
+    def grab_imgs(p, desired, _spatial):
+        #  Check whether we would find something in this spatial res.
+        res_bands = set(bands_for_resolution(_spatial)).intersection(desired)
+        desired.difference(res_bands)
+        result = []
+        #  If not, return
+        if len(res_bands) == 0:
+            return []
+        #  Traverse images for current spatial resolution and if we find band we were looking for
+        #  add it's path to the list
+        for _p in p:
+            reg = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', _p)
+            if len(reg) != 0:
+                reg = reg[-1]
+            if reg in res_bands:
+                result.append(_p)
+                desired -= {reg}
+        return result
+
+    #  Current images for granule
+    found_imgs = found_imgs
+    desired_bands = set(desired_bands)
+    #  First we will check what particular bands we are missing, then we look for it
+    for found in found_imgs:
+        f = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', found)
+        if len(f) != 0:
+            f = f[-1]
+        desired_bands -= {f}
+    #  desired_bands => bands we want to find, if it's length is 0 it means we already have everything in found_imgs
+    if len(desired_bands) == 0:
+        return found_imgs
+    #  [0:7] - 10m, [7:20] - 20m, [20::] - 60m
+    if spatial != 10:
+        p = img_paths[0:7]
+        found_imgs += grab_imgs(p, desired_bands, 10)
+        if len(desired_bands) == 0:
+            return found_imgs
+    if spatial != 20:
+        p = img_paths[7:20]
+        found_imgs += grab_imgs(p, desired_bands, 20)
+        if len(desired_bands) == 0:
+            return found_imgs
+    if spatial != 60:
+        p = img_paths[20::]
+        found_imgs += grab_imgs(p, desired_bands, 60)
+        if len(desired_bands) == 0:
+            return found_imgs
+    return found_imgs

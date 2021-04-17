@@ -1,24 +1,22 @@
 from datetime import datetime
 from xml.etree import ElementTree  # xml
 from osgeo import gdal
-from Pipeline.PipelineBand import *
+from Pipeline.Band import *
 from Pipeline.utils import *
 from Pipeline.logger import log
 
 gdal.UseExceptions()
 
 
-class S2Worker:
-    """
-    This class can be instantiated only inside S2Runner.
-    """
+class S2Granule:
 
-    def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1):
+    def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1, t_srs: str = 'EPSG:32633'):
         if not is_dir_valid(path):
             raise FileNotFoundError("Dataset has not been found !")
         self.path = path
         self.spatial_resolution = spatial_res
         self.desired_bands = desired_bands
+        self.t_srs = t_srs
         self.meta_data_path = self.path + os.path.sep + "MTD_MSIL2A.xml"
         self.meta_data_gdal = None
         self.meta_data = None
@@ -36,9 +34,18 @@ class S2Worker:
         log.info(f"Initialized worker: {self.path}\n{self}")
 
     def __find_images(self):
+        """
+        Methods tries to find images in the granule directory.
+        If meta data file is present, it grabs paths and validate if they exist.
+        Also at the end checks whether we have desired bands.
+        If meta data file is present but the paths to the raster images are incorrect, it grabs all available
+        images in the directory. The same is done if the meta data file was not provided.
+        """
         if self.meta_data_gdal is None:
             log.info(f"MTDMSIL2A.xml has not been found in {self.path}")
             self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
+            if len(self.paths_to_raster) == 0:
+                self.paths_to_raster = get_files_in_directory(self.path, '.tif')
             return
         log.info(f"MTDMSIL2A.xml has been found in {self.path}")
         tree = ElementTree.parse(self.meta_data_path)
@@ -49,6 +56,7 @@ class S2Worker:
             if os.name == 'nt':
                 text = text.replace('/', '\\')
             images.append(self.path + os.sep + text + '.jp2')
+        #  [0:7] - 10m, [7:20] - 20m, [20::] - 60m
         if self.spatial_resolution == 10:
             self.paths_to_raster = images[0:7]
         elif self.spatial_resolution == 20:
@@ -56,26 +64,35 @@ class S2Worker:
         else:
             self.paths_to_raster = images[20::]
         if not is_file_valid(self.paths_to_raster[0]):
-            log.info("Path from meta-data file do not exist...\nChecking the directory...")
+            log.info("File found in meta-data do not exist...\nChecking the directory...")
             self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
+        else:
+            self.paths_to_raster = verify_bands(images, self.paths_to_raster,
+                                                self.desired_bands, self.spatial_resolution)
         log.info(f"Final paths to raster data {self.paths_to_raster}")
 
     def __to_band_dictionary(self) -> dict:
         """
         Match list of paths of bands to dictionary for better access.
         """
-        log.info("Creating bands from raster paths...")
         if not self.paths_to_raster or len(self.paths_to_raster) == 0:
-            return {}
+            log.error(f"Raster images not present in {self.path}")
+            raise FileNotFoundError("Images not present")
         e_dict = dict()  # create new dictionary
         # spatial_res = int(re.findall(r'\d+', array[0])[-1])
         if self.spatial_resolution not in e_dict:
             e_dict[self.spatial_resolution] = {}
         for band in self.paths_to_raster:
-            key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL', band)[-1]
-            # TODO: is it necessary ?... maybe we'd like to init every available band (this should be independent from output bands)
+            key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL|rgb|DOY', band)
+            if len(key) != 0:
+                key = key[-1]
+            # TODO: is it necessary ?... maybe we'd like to init every available band (this should be independent
+            #  from output bands)
             if key in self.desired_bands:
-                e_dict[self.spatial_resolution][key] = Band(band, slice_index=self.slice_index)
+                b = Band(band, slice_index=self.slice_index)
+                if b.profile["width"] != s2_get_resolution(self.spatial_resolution)[0]:
+                    b.resample(s2_get_resolution(self.spatial_resolution)[0] / b.profile["width"], delete=True)
+                e_dict[self.spatial_resolution][key] = b
         for band in self.desired_bands:
             if band not in e_dict[self.spatial_resolution]:
                 raise Exception(f"Band {band} is missing in the dataset")
@@ -91,7 +108,7 @@ class S2Worker:
             self.doy = self.data_take.timetuple().tm_yday
             log.info("Meta data initialized.")
         except Exception as e:
-            log.warning('Opening meta data file raised an exception\n', e, "\nWorker continues without metadata file!")
+            log.warning("Worker continues without metadata file!")
 
     def get_image_resolution(self) -> Tuple[int, int]:
         if self.spatial_resolution == 10:
@@ -144,6 +161,18 @@ class S2Worker:
             stack.append(self.bands[self.spatial_resolution][key].raster())
         log.info(f"STACK ORDER: {desired_order}")
         return np.stack(stack)
+
+    def get_initialized_bands(self) -> List[str]:
+        if len(self.bands) == 0:
+            return []
+        return [key for key in self.bands[self.spatial_resolution]]
+
+    def get_projection(self):
+        return list(self.bands[self.spatial_resolution].values())[-1].profile["crs"]
+
+    def reproject_bands(self, target_projection: str):
+        for band in self.bands[self.spatial_resolution].values():
+            band.band_reproject(t_srs=target_projection)
 
     def __getitem__(self, item):
         """
