@@ -18,8 +18,4 @@ flake8:
 pytest:
   stage: Test
   script:
-  - pwd
-  - ls -l
-  - export PYTHONPATH="$PYTHONPATH:."
-  - python -c "import sys;print(sys.path)"
-  - pytest Pipeline/test.py
+  - python -m pytest Pipeline/test.py
