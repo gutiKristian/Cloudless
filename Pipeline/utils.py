@@ -137,7 +137,7 @@ def ndvi(red: numpy.ndarray, nir: numpy.ndarray) -> numpy.ndarray:
 
 def slice_raster(index: int, image: numpy.ndarray) -> numpy.ndarray:
     """
-    Modifies the image, in-situ function.
+    Modifies the image.
     :param index - slicing index
     :param image - reference to the base image
     :return: sliced image
@@ -203,7 +203,6 @@ def create_rgb_uint8(r, g, b, path, tile):
         dst.update_tags(ns='rio_overview', resampling='nearest')
 
 
-
 def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", rgb=False, **kwargs) -> None:
     """
     Build mosaic from files. Using gdal vrt.
@@ -215,7 +214,8 @@ def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", rgb=F
     _destination = format_path(destination) + "mosaic.vrt"
     final_image = format_path(destination) + name + ".tif"
     escaped_paths = " ".join(f'"{p}"' for p in paths)
-    process = subprocess.Popen(f"gdalbuildvrt -q \"{_destination}\" {escaped_paths}", shell=True, stdout=subprocess.PIPE)
+    process = subprocess.Popen(f"gdalbuildvrt -q \"{_destination}\" {escaped_paths}", shell=True,
+                               stdout=subprocess.PIPE)
     process.wait()
     #  Experiment, NOTE: TILED is making artefacts on monochromatic pictures!
     if rgb:
@@ -225,8 +225,9 @@ def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", rgb=F
                                    stdout=subprocess.PIPE)
         process.wait()
     else:
-        process = subprocess.Popen(f"gdal_translate -of GTiff -co \"TILED=YES\" \"{_destination}\" \"{final_image}\" -q",
-                                   shell=True, stdout=subprocess.PIPE)
+        process = subprocess.Popen(
+            f"gdal_translate -of GTiff -co \"TILED=YES\" \"{_destination}\" \"{final_image}\" -q",
+            shell=True, stdout=subprocess.PIPE)
         process.wait()
     process = subprocess.Popen(f"rm \"{_destination}\"", shell=True, stdout=subprocess.PIPE)
     process.wait()

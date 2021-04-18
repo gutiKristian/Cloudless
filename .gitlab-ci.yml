@@ -21,4 +21,4 @@ stages:
 pytest:
   stage: Test
   script:
-  - python -m pytest Pipeline/test.py
+  - python -m pytes tests/TestUtils.py
