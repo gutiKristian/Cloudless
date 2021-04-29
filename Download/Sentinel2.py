@@ -196,7 +196,8 @@ class Downloader:
             raise ValueError("Wrong spatial resolution")
         self.__before_download()
         if bands is None:
-            bands = bands_for_resolution(primary_spatial_res)
+            prim = 60 if primary_spatial_res == "60m" else (20 if primary_spatial_res == "20m" else 10)
+            bands = bands_for_resolution(prim)
         status = True  # If the dataset health is ok
         for mercator, entries in self.__get_next_download():
             working_path = self.root_path + mercator  # path where all datasets are going to be downloaded
