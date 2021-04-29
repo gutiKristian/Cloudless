@@ -1,3 +1,5 @@
+import numpy as np
+
 from Pipeline.Granule import *
 from Pipeline.utils import *
 from osgeo import gdal
@@ -10,7 +12,7 @@ from rasterio.profiles import Profile as RasterioProfile
 class GranuleCalculator:
 
     @staticmethod
-    def save_band_rast(raster: np.ndarray, path: str, prof: RasterioProfile = None, dtype: type = None,
+    def save_band_rast(raster: np.ndarray, path: str, prof: RasterioProfile = None, dtype: np.dtype = None,
                        driver: str = None):
         if dtype is not None:
             prof.update(dtype=dtype)
@@ -122,8 +124,11 @@ class GranuleCalculator:
         granule.temp["NDVI"] = _ndvi
         if not save:
             return _ndvi
-        GranuleCalculator.save_band_rast(_ndvi, path=granule.path, prof=granule['B8A'].profile,
-                                         dtype=np.float, driver="GTiff")
+        path = granule.path + os.path.sep + f"ndvi_{granule.spatial_resolution}"
+        GranuleCalculator.save_band_rast(_ndvi, path=path, prof=granule['B8A'].profile,
+                                         dtype=np.dtype('float'), driver="GTiff")
+        # initialize new band
+        granule.add_another_band(path, "ndvi")
         del nir, red
         return _ndvi
 
@@ -147,8 +152,10 @@ class GranuleCalculator:
         granule.temp["ARI1"] = ari1
         if not save:
             return ari1
-        GranuleCalculator.save_band_rast(ari1, path=granule.path, prof=granule["B03"].profile,
-                                         dtype=np.float, driver="GTiff")
+        path = granule.path + os.path.sep + f"ari1_{granule.spatial_resolution}"
+        GranuleCalculator.save_band_rast(ari1, path=path, prof=granule["B03"].profile,
+                                         dtype=np.dtype('float'), driver="GTiff")
+        granule.add_another_band(path, "ari1")
         return ari1
 
     @staticmethod
@@ -175,9 +182,15 @@ class GranuleCalculator:
         return arr
 
     @staticmethod
-    def build_mosaics(granules: List[S2Granule], path: str, name: str = "_mosaic", **kwargs):
-        bands = {"B01", "B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B09", "B11", "B12", "AOT", "RGB", "SCL",
-                 "WVP", "DOY", "rgb"}
+    def build_mosaics(granules: List[S2Granule], path: str, name: str = "_mosaic", **kwargs) -> None:
+        """
+        Method gathers all initialized bands inside a Granule and compares it with the others.
+        For each Band that is present in every Granule, mosaic is built.
+        """
+        if len(granules) == 0:
+            log.warning("Empty list of granules. Terminating...")
+            return
+        bands = set(granules[0].get_initialized_bands())  # init values
         #  Get bands that are present in every granule
         for granule in granules:
             b = set(granule.get_initialized_bands())
