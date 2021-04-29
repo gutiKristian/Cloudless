@@ -7,13 +7,18 @@ from typing import Callable
 import rasterio
 import os
 from rasterio.profiles import Profile as RasterioProfile
+from Pipeline.utils import profile_for_rgb
 
 
 class GranuleCalculator:
 
     @staticmethod
     def save_band_rast(raster: np.ndarray, path: str, prof: RasterioProfile = None, dtype: np.dtype = None,
-                       driver: str = None):
+                       driver: str = None) -> str:
+        """
+        Save numpy array as raster image.
+        Returns path to the file.
+        """
         if dtype is not None:
             prof.update(dtype=dtype)
         if driver is not None:
@@ -32,7 +37,7 @@ class GranuleCalculator:
 
         iterations = 1
         if dim == 3:
-            iterations = len(raster)[0]
+            iterations = len(raster)
         prof.update(count=iterations)
 
         with rasterio.open(path, 'w', **prof) as dst:
@@ -41,6 +46,7 @@ class GranuleCalculator:
                     dst.write(raster[i - 1], i)
                 else:
                     dst.write(raster, i)
+        return path
 
     @staticmethod
     def save_band(raster_img, name: str, granule: S2Granule = None, path: str = None, driver: str = "GTiff",
@@ -111,6 +117,51 @@ class GranuleCalculator:
         return path  # path where it is saved
 
     @staticmethod
+    def s2_agriculture(granule: S2Granule, save: bool = False):
+        stacked = granule.stack_bands(desired_order=["B11", "B08", "B02"])
+        path = granule.path + os.path.sep + f"agriculture_{granule.spatial_resolution}"
+        if not save:
+            return stacked
+        for i in range(len(stacked)):
+            stacked[i] = rescale_intensity(stacked[i], 0, 4096)
+        stacked = stacked.astype(numpy.uint8)
+        profile = granule['B02'].profile
+        profile = profile_for_rgb(profile)
+        path = GranuleCalculator.save_band_rast(stacked, path, prof=profile, driver="GTiff")
+        granule.add_another_band(path, "agriculture")
+        return stacked
+
+    @staticmethod
+    def s2_color_infrared(granule: S2Granule, save: bool = False):
+        stacked = granule.stack_bands(desired_order=["B8A", "B04", "B03"])
+        path = granule.path + os.path.sep + f"infrared_{granule.spatial_resolution}"
+        if not save:
+            return stacked
+        for i in range(len(stacked)):
+            stacked[i] = rescale_intensity(stacked[i], 0, 4096)
+        stacked = stacked.astype(numpy.uint8)
+        profile = granule['B02'].profile
+        profile = profile_for_rgb(profile)
+        path = GranuleCalculator.save_band_rast(stacked, path, prof=profile)
+        granule.add_another_band(path, "infrared")
+        return stacked
+
+    @staticmethod
+    def s2_moisture_index(granule: S2Granule, save: bool = False):
+        path = granule.path + os.path.sep + f"moisture_index_{granule.spatial_resolution}"
+        b8 = granule['B8A'].raster().astype(float)
+        b11 = granule['B11'].raster().astype(float)
+        m1 = (b8 - b11)
+        m2 = (b8 + b11)
+        numpy.divide(m1, m2, out=m1, where=m2 != 0).squeeze()
+        if not save:
+            return m1
+        profile = granule['B8A'].profile
+        path = GranuleCalculator.save_band_rast(m1, path, prof=profile, dtype=np.dtype('float'), driver="GTiff")
+        granule.add_another_band(path, "moisture_index")
+        return m1
+
+    @staticmethod
     def s2_ndvi(granule: S2Granule, save: bool = False):
         """
         Calculates the Normalized difference vegetation index
@@ -125,8 +176,8 @@ class GranuleCalculator:
         if not save:
             return _ndvi
         path = granule.path + os.path.sep + f"ndvi_{granule.spatial_resolution}"
-        GranuleCalculator.save_band_rast(_ndvi, path=path, prof=granule['B8A'].profile,
-                                         dtype=np.dtype('float'), driver="GTiff")
+        path = GranuleCalculator.save_band_rast(_ndvi, path=path, prof=granule['B8A'].profile,
+                                                dtype=np.dtype('float'), driver="GTiff")
         # initialize new band
         granule.add_another_band(path, "ndvi")
         del nir, red
@@ -153,8 +204,8 @@ class GranuleCalculator:
         if not save:
             return ari1
         path = granule.path + os.path.sep + f"ari1_{granule.spatial_resolution}"
-        GranuleCalculator.save_band_rast(ari1, path=path, prof=granule["B03"].profile,
-                                         dtype=np.dtype('float'), driver="GTiff")
+        path = GranuleCalculator.save_band_rast(ari1, path=path, prof=granule["B03"].profile,
+                                                dtype=np.dtype('float'), driver="GTiff")
         granule.add_another_band(path, "ari1")
         return ari1
 
