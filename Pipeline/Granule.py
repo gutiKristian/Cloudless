@@ -118,12 +118,10 @@ class S2Granule:
             return 5490, 5490
         return 1830, 1830
 
-    def add_another_band(self, path_to_band: str, spatial_resolution: str, key: str) -> None:
+    def add_another_band(self, path_to_band: str, key: str) -> None:
         """
         :param path_to_band - path to the raster data
-        :param spatial_resolution - spatial resolution of the image, if it does not correspond to the working spatial
         :param key - used for lookup inside granule
-        resolution, resampling is performed on the image, WARNING the image is modified
         """
         b = Band(path_to_band, slice_index=self.slice_index)
         if b.profile["width"] != s2_get_resolution(self.spatial_resolution)[0]:
