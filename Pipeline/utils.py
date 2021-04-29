@@ -180,9 +180,9 @@ def rescale_intensity(image, _min, _max):
 
 
 def create_rgb_uint8(r, g, b, path, tile):
-    red = rescale_intensity(rasterio.open(r).read(1), 0, 3096)
-    green = rescale_intensity(rasterio.open(g).read(1), 0, 3096)
-    blue = rescale_intensity(rasterio.open(b).read(1), 0, 3096)
+    red = rescale_intensity(rasterio.open(r).read(1), 0, 4096)
+    green = rescale_intensity(rasterio.open(g).read(1), 0, 4096)
+    blue = rescale_intensity(rasterio.open(b).read(1), 0, 4096)
 
     rgb_profile = rasterio.open(r).profile
     rgb_profile['dtype'] = 'uint8'
