@@ -128,7 +128,7 @@ class GranuleCalculator:
         return _ndvi
 
     @staticmethod
-    def ari1(granule: S2Granule, save: bool = False):
+    def s2_ari1(granule: S2Granule, save: bool = False):
         """
         ARI - Anthocyanin Reflectance Index
         Anthocyanins are pigments common in higher plants, causing their red, blue and purple coloration.
