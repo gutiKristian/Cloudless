@@ -84,8 +84,9 @@ class S2Granule:
             e_dict[self.spatial_resolution] = {}
         for band in self.paths_to_raster:
             key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL|rgb|DOY', band)
-            if len(key) != 0:
-                key = key[-1]
+            if len(key) == 0:
+                pass
+            key = key[-1]
             # TODO: is it necessary ?... maybe we'd like to init every available band (this should be independent
             #  from output bands)
             if key in self.desired_bands:
@@ -117,8 +118,17 @@ class S2Granule:
             return 5490, 5490
         return 1830, 1830
 
-    def add_another_band(self) -> None:
-        pass  # TODO: RESAMPLE AND UPDATE THE DICT AND DESIRED BANDS OR HOWEVER IT IS CALLED NOW
+    def add_another_band(self, path_to_band: str, spatial_resolution: str, key: str) -> None:
+        """
+        :param path_to_band - path to the raster data
+        :param spatial_resolution - spatial resolution of the image, if it does not correspond to the working spatial
+        :param key - used for lookup inside granule
+        resolution, resampling is performed on the image, WARNING the image is modified
+        """
+        b = Band(path_to_band, slice_index=self.slice_index)
+        if b.profile["width"] != s2_get_resolution(self.spatial_resolution)[0]:
+            b.resample(s2_get_resolution(self.spatial_resolution)[0] / b.profile["width"], delete=True)
+        self.bands[self.spatial_resolution][key] = b
 
     def load_bands(self, desired_bands: List[str] = None):
         """
