@@ -182,7 +182,7 @@ class S2Granule:
         for band in self.bands[self.spatial_resolution].values():
             band.band_reproject(t_srs=target_projection)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> Band:
         """
         The band that will be returned is band with the active
         spatial resolution
