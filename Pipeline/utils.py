@@ -285,3 +285,17 @@ def verify_bands(img_paths: List[str], found_imgs: List[str], desired_bands: Lis
         if len(desired_bands) == 0:
             return found_imgs
     return found_imgs
+
+
+def profile_for_rgb(profile: rasterio.profiles.Profile) -> rasterio.profiles.Profile:
+    """
+    Modify rasterio profile for RGB image.
+    """
+    profile['dtype'] = 'uint8'
+    profile['count'] = 3
+    profile['photometric'] = "RGB"
+    profile['driver'] = "GTiff"
+    profile['blockxsize'] = 256
+    profile['blockysize'] = 256
+    profile['nodata'] = 0
+    return profile
