@@ -8,26 +8,26 @@ import numpy as np
 
 class S2JIT:
 
-    @staticmethod
-    @njit(parallel=True)
-    def s2_ndvi_pixel_masking(ndvi, offset=0):
-        """
-        Per pixel masking of the best ndvi pixels.
-        @param ndvi: ndvi of each worker
-        @param offset: offsetting granules, making ndvi with granules[10:20] -> offset = 9
-        :return: mask of indices of the granules and worker map of used granules
-        """
-        result = np.zeros(shape=(ndvi.shape[1], ndvi.shape[2]))
-        workers = np.zeros(ndvi.shape[0] + offset)
-        x_res = ndvi.shape[1]
-        y_res = ndvi.shape[2]
-        for y in prange(y_res):
-            for x in prange(x_res):
-                r = ndvi[:, x, y].argmax() + offset  # if we had to split this operation
-                if workers[r] == 0:
-                    workers[r] = 1
-                result[x, y] = r
-        return result, workers
+    # @staticmethod
+    # @njit(parallel=True)
+    # def s2_ndvi_pixel_masking(ndvi, offset=0):
+    #     """
+    #     Per pixel masking of the best ndvi pixels.
+    #     @param ndvi: ndvi of each worker
+    #     @param offset: offsetting granules, making ndvi with granules[10:20] -> offset = 9
+    #     :return: mask of indices of the granules and worker map of used granules
+    #     """
+    #     result = np.zeros(shape=(ndvi.shape[1], ndvi.shape[2]))
+    #     workers = np.zeros(ndvi.shape[0] + offset)
+    #     x_res = ndvi.shape[1]
+    #     y_res = ndvi.shape[2]
+    #     for y in prange(y_res):
+    #         for x in prange(x_res):
+    #             r = ndvi[:, x, y].argmax() + offset  # if we had to split this operation
+    #             if workers[r] == 0:
+    #                 workers[r] = 1
+    #             result[x, y] = r
+    #     return result, workers
 
     @staticmethod
     @njit
@@ -49,8 +49,9 @@ class S2JIT:
                 _max_val = -math.inf
                 index = 0
                 # i - worker index; y,x are coords
+                # np.sum is no data indicator, we don't want pixels with no data in image
                 for i in range(len(data)):
-                    if ndvi[i][y, x] > _max_val:
+                    if ndvi[i][y, x] > _max_val and np.sum(data[i][:, y, x]) > 0:
                         _max_val = ndvi[i][y, x]
                         index = i
                 if ndvi_res[y, x] <= ndvi[index][y, x]:
