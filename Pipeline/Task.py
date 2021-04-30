@@ -49,7 +49,7 @@ class NdviPerPixel(Task):
                 GranuleCalculator.s2_ndvi(w)
                 # TODO: take mask as function (like per-tile)
                 mask = (w["B02"] > 100) & (w["B04"] > 100) & (w["B8A"] > 500) & (w["B8A"] < 8000) & (w["AOT"] < 100)
-                ndvi_arrays[i] = np.ma.array(w.temp["NDVI"], mask=~mask, fill_value=0).filled()
+                ndvi_arrays[i] = np.ma.array(w.temp["NDVI"], mask=~mask, fill_value=-1).filled()
                 del mask
                 current_data.append(w.stack_bands(worker.output_bands))
                 w.free_resources()  # We have copied the resources to the new numpy array inside current_data
