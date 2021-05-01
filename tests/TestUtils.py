@@ -104,3 +104,10 @@ class TestUtils:
                 assert bn not in m20
             else:
                 assert bn in m20
+
+    # def test_ndvi(self):
+    #     first = np.array([0, 0, 0, 0, 0, 0])
+    #     second = np.array([1, 1, 1, 1, 1, 1])
+    #     third = np.array([1, 2, 3, 4, 5, 6])
+    #     assert ndvi(first, second) == second * (-1)
+    #     assert ndvi(second, third) == np.array([0, -1/3, -0.5, -3/5, -2/3, -5/7])
