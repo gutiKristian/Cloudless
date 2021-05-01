@@ -9,7 +9,7 @@ from Pipeline.Granule import S2Granule
 from Pipeline.utils import *
 from numba.typed import List as LIST
 from Pipeline.Mask import S2JIT
-
+from Pipeline.Detectors import S2Detectors
 
 class Task(ABC):
 
@@ -76,7 +76,7 @@ class NdviPerPixel(Task):
 class PerTile(Task):
 
     @staticmethod
-    def perform_computation(worker: S2Worker, detector=GranuleCalculator.s2_cloud_mask_scl) -> S2Granule:
+    def perform_computation(worker: S2Worker, detector=S2Detectors.scl) -> S2Granule:
         log.info(f"Running per-tile masking. Dataset {worker.main_dataset_path}")
         # Gather information
         res_x, res_y = s2_get_resolution(worker.spatial_resolution)

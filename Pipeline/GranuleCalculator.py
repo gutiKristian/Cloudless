@@ -210,13 +210,6 @@ class GranuleCalculator:
         return ari1
 
     @staticmethod
-    def s2_cloud_mask_scl(w: S2Granule) -> np.ndarray:
-        a = w["SCL"] > 7
-        b = w["SCL"] < 11
-        c = w["SCL"] < 1
-        return (a & b) | c
-
-    @staticmethod
     def s2_pertile_cloud_index_mask(granule: S2Granule, detector: Callable) -> np.array:
         log.debug(f"Worker {granule.doy}, cloud index mask.")
         #  Compute cloud mask for each tile
