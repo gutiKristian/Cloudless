@@ -42,7 +42,7 @@ class TestUtils:
         assert bands_for_resolution(20) == ["B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B11", "B12", "AOT", "SCL"]
         assert bands_for_resolution(10) == ["B02", "B03", "B04", "B08", "AOT"]
         assert bands_for_resolution(60) == ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B09", "B11", "B12",
-                                            "AOT"]
+                                            "AOT", "SCL"]
 
     def test_supported_slice_index(self):
         for s in TestUtils.supported:
