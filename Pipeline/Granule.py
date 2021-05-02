@@ -141,11 +141,12 @@ class S2Granule:
 
     def free_resources(self) -> None:
         """
-        Release the bands numpy arrays. Not the temp!
+        Release the bands numpy arrays! With the TEMPS
         :return: None
         """
         for band in self.bands[self.spatial_resolution].values():
             band.free_resources()
+        self.temp = {}
 
     def update_worker(self, name: str, path: str):
         """
