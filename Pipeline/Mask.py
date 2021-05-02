@@ -31,6 +31,25 @@ class S2JIT:
 
     @staticmethod
     @njit
+    def s2_median_analysis(data, median_values):
+        """
+        JIT-ed method for picking median, purpose is to avoid picking no data values with basic np.median.
+        """
+        res_x, res_y = median_values.shape
+        for y in range(res_y):
+            for x in range(res_x):
+                if median_values[y][x] == 0:
+                    pick = 0
+                    inspected_arr = data[:, y, x]
+                    for i in range(len(inspected_arr) // 2 - 1, len(inspected_arr)):
+                        if inspected_arr[i] != 0:
+                            pick = inspected_arr[i]
+                            break
+                    median_values[y][x] = pick
+        return median_values
+
+    @staticmethod
+    @njit
     def s2_ndvi_pixel_analysis(ndvi, ndvi_res, data, doys, result, doy, res_x, res_y):
         """
         Per pixel analysis for NDVI masking

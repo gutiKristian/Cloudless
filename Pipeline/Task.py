@@ -1,5 +1,8 @@
 import gc
 from abc import ABC, abstractmethod
+
+import rasterio
+
 from Pipeline.logger import log
 from Pipeline.Worker import S2Worker
 from Pipeline.GranuleCalculator import GranuleCalculator
@@ -10,6 +13,7 @@ from Pipeline.utils import *
 from numba.typed import List as LIST
 from Pipeline.Mask import S2JIT
 from Pipeline.Detectors import S2Detectors
+
 
 class Task(ABC):
 
@@ -62,6 +66,45 @@ class NdviPerPixel(Task):
             worker.result[band] = result[i]
         worker.result["DOY"] = doy
         gc.collect()
+        log.info("Saving result to the files...")
+        worker._save_result()  # Save result into files
+        r, g, b = extract_rgb_paths(worker.save_result_path)
+        create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
+        log.info("Done!")
+        worker.release_bands()
+        # If there's an intention to work further with the files
+        # Return result Granule
+        return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands + ["rgb"])
+
+
+class MedianPerPixel(Task):
+
+    @staticmethod
+    def perform_computation(worker: S2Worker) -> S2Granule:
+        """
+        This method takes the median of all the pixels.
+        """
+        log.info(f"Running per-pixel median masking. Dataset {worker.main_dataset_path}")
+        log.info(f"Picked bands: {worker.output_bands}, expected iterations: {len(worker.output_bands)}")
+        res_x, res_y = s2_get_resolution(worker.spatial_resolution)
+        for i, band_key in enumerate(worker.output_bands, 0):
+            #  Reference object for yielding size of window block, since the blocks might not be same in each iteration
+            #  this is the best of possible ways to get the block
+            reference_object = worker.granules[0][band_key].path
+            worker.result[band_key] = np.ones(shape=(res_x, res_y), dtype=np.uint16)
+            with rasterio.open(reference_object) as reference:
+                for ji, window in reference.block_windows(1):
+                    current_blocks = LIST()  # array of blocks where for each pixel median is picked
+                    for j, granule in enumerate(worker.granules, 0):
+                        current_blocks.append(granule[band_key].rasterio_ref().read(1, window=window))
+                    data = np.stack(current_blocks)
+                    median_values = np.median(data, axis=0)
+                    res = S2JIT.s2_median_analysis(data, median_values)
+                    del data
+                    # current_blocks is filled now get the median
+                    worker.result[band_key][window.row_off:window.row_off + window.height,
+                    window.col_off:window.col_off + window.width] = res
+            log.info(f"{band_key} done.")
         log.info("Saving result to the files...")
         worker._save_result()  # Save result into files
         r, g, b = extract_rgb_paths(worker.save_result_path)
