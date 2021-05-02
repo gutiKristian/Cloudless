@@ -98,7 +98,7 @@ def bands_for_resolution(spatial_resolution):
         return ["B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B11", "B12", "AOT", "SCL"]
     elif spatial_resolution == 10:
         return ["B02", "B03", "B04", "B08", "AOT"]
-    return ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B09", "B11", "B12", "AOT"]  # 60
+    return ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B09", "B11", "B12", "AOT", "SCL"]  # 60
 
 
 # --------------- BAND UTILS ---------------
