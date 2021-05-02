@@ -27,6 +27,12 @@ class S2Detectors:
         :param g: granule which contains the data
         :return: numpy array
         """
-        ndvi = GranuleCalculator.s2_ndvi(g)
+        from Pipeline.Plotting import Plot
+        from Pipeline.utils import glue_raster
+        ndvi = GranuleCalculator.s2_ndvi(g) * (-1)
+
+        # no data values
+        mask = (g['B8A'].raster() == 0) & (g['B04'].raster() == 0)
+        ndvi = np.ma.masked_array(data=ndvi, mask=mask, fill_value=float(4)).filled()
         # linear transformation
         return 1.5 * (ndvi + 1)
