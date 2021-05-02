@@ -1,6 +1,7 @@
 from Pipeline.Granule import S2Granule
 from Pipeline.GranuleCalculator import GranuleCalculator
 import numpy as np
+from typing import List
 from skimage.exposure import rescale_intensity
 
 
@@ -15,7 +16,7 @@ class S2Detectors:
         # filter clouds
         a = g["SCL"] > 7
         b = g["SCL"] < 11
-        c = g["SCL"] < 1  # no data
+        c = g["SCL"] == 0  # no data
         return (a & b) | c
 
     @staticmethod
@@ -36,3 +37,11 @@ class S2Detectors:
         ndvi = np.ma.masked_array(data=ndvi, mask=mask, fill_value=float(4)).filled()
         # linear transformation
         return 1.5 * (ndvi + 1)
+
+    @staticmethod
+    def sentinel_cloudless(paths: List[str]):
+        """
+        Cloud detection based on machine learning algorithm by SentinelHub.
+        @param paths - paths L1C dataset
+        """
+        pass
