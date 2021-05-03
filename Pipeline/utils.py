@@ -73,13 +73,15 @@ def extract_mercator(path: str) -> str:
 
 
 def s2_get_resolution(spatial):
-    if not s2_is_spatial_correct(spatial):
-        raise Exception("This spatial resolution does not exist in the sentinel 2 context")
     if spatial == 10:
         return 10980, 10980
     if spatial == 20:
         return 5490, 5490
-    return 1830, 1830
+    elif spatial == 60:
+        return 1830, 1830
+    log.info("Spatial not present, calculating on the fly...")
+    val = spatial / 10
+    return 10980 / val, 10980 / val
 
 
 def look_up_raster(node, element):
@@ -99,6 +101,10 @@ def bands_for_resolution(spatial_resolution):
     elif spatial_resolution == 10:
         return ["B02", "B03", "B04", "B08", "AOT"]
     return ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B09", "B11", "B12", "AOT", "SCL"]  # 60
+
+
+def s2_l1c_bands():
+    return ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B09", "B10", "B11", "B12"]
 
 
 # --------------- BAND UTILS ---------------
@@ -299,3 +305,7 @@ def profile_for_rgb(profile: rasterio.profiles.Profile) -> rasterio.profiles.Pro
     profile['blockysize'] = 256
     profile['nodata'] = 0
     return profile
+
+
+def supported_granule_type(_type: str) -> bool:
+    return _type in ["L1C", "L2A"]

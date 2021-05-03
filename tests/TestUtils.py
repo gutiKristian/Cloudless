@@ -35,6 +35,8 @@ class TestUtils:
         assert s2_get_resolution(10) == (10980, 10980)
         assert s2_get_resolution(20) == (5490, 5490)
         assert s2_get_resolution(60) == (1830, 1830)
+        # on the fly res
+        assert s2_get_resolution(160) == (686.25, 686.25)
 
     def test_bands_for_resolution(self):
         with pytest.raises(Exception):
