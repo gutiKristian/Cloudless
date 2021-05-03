@@ -114,7 +114,7 @@ class Band:
                     int(dataset.height * sample_factor),
                     int(dataset.width * sample_factor)
                 ),
-                resampling=rasterio.enums.Resampling.bilinear
+                resampling=rasterio.enums.Resampling.nearest
             )
             height = dataset.height * sample_factor
             width = dataset.width * sample_factor
