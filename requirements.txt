@@ -13,3 +13,4 @@ pytest==6.2.3
 flake8==3.9.1
 rasterio==1.1.8
 scikit-image==0.18.1
+s2cloudless==1.5.0
