@@ -66,8 +66,8 @@ class Downloader:
         if not Downloader.is_valid_cloud_cov(cloud_coverage):
             raise IncorrectInput("Bad format: cloud coverage.")
         self.cloud_coverage = cloud_coverage
-        if not Downloader.is_valid_date_range(date):
-            raise IncorrectInput("Bad format: date")
+        # if not Downloader.is_valid_date_range(date):
+        #     raise IncorrectInput("Bad format: date")
         self.date = date
         self.product_type = product_type
         self.tile_uuids = uuid
@@ -416,11 +416,11 @@ class Downloader:
             log.warning(f"Provided cloud coverave interval is small, there may be fewer result or even None")
         return True
 
-    @staticmethod
-    def is_valid_date_range(date: Tuple) -> bool:
-        if date is None or len(date) != 2 or (date[1] - date[0]).days < 0:
-            return False
-        return True
+    # @staticmethod
+    # def is_valid_date_range(date: Tuple) -> bool:
+    #     if date is None or len(date) != 2 or (date[1] - date[0]).days < 0:
+    #         return False
+    #     return True
 
     @staticmethod
     def validate_mercator_tiles(tiles: List[str]) -> List[str]:
