@@ -28,8 +28,6 @@ class S2Detectors:
         :param g: granule which contains the data
         :return: numpy array
         """
-        from Pipeline.Plotting import Plot
-        from Pipeline.utils import glue_raster
         ndvi = GranuleCalculator.s2_ndvi(g) * (-1)
 
         # no data values
@@ -39,9 +37,11 @@ class S2Detectors:
         return 1.5 * (ndvi + 1)
 
     @staticmethod
-    def sentinel_cloudless(paths: List[str]):
+    def sentinel_cloudless(g: S2Granule) -> np.ndarray:
         """
         Cloud detection based on machine learning algorithm by SentinelHub.
-        @param paths - paths L1C dataset
+        Granule is identified and accompanying L1C dataset is downloaded and mas computed.
+        @param g - granule.
         """
         pass
+
