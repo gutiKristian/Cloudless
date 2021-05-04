@@ -1,11 +1,24 @@
+import logging
+import os
+
+import cv2
+import skimage.transform
+
 from Pipeline.Granule import S2Granule
 from Pipeline.GranuleCalculator import GranuleCalculator
 import numpy as np
+from Pipeline.logger import log
 from typing import List
+from Pipeline.utils import extract_mercator, s2_get_resolution, slice_raster
+from Download.Sentinel2 import Downloader
 from skimage.exposure import rescale_intensity
+from s2cloudless import S2PixelCloudDetector
 
 
 class S2Detectors:
+    """
+    Detectors for Per-Tile.
+    """
     @staticmethod
     def scl(g: S2Granule) -> np.ndarray:
         """
@@ -16,7 +29,7 @@ class S2Detectors:
         # filter clouds
         a = g["SCL"] > 7
         b = g["SCL"] < 11
-        c = g["SCL"] == 0  # no data
+        c = g["SCL"] < 1  # no data
         return (a & b) | c
 
     @staticmethod
@@ -41,7 +54,42 @@ class S2Detectors:
         """
         Cloud detection based on machine learning algorithm by SentinelHub.
         Granule is identified and accompanying L1C dataset is downloaded and mas computed.
+        In future we might save these mask and use them but for now we will download the data and compute the mask
+        over and over.
         @param g - granule.
         """
-        pass
+        # Workspace preparation phase
+        working_path = g.path + os.path.sep + "L1C"
+        try:
+            os.mkdir(working_path)
+        except NotImplementedError:
+            log.error("Error while creating mask for {}".format(g.path))
+            #  Automatically discarded (taken as cloudy)
+            return np.ones(shape=(s2_get_resolution(g.spatial_resolution)))
 
+        #  Data preparation phase
+        #  We find the accompanying tile with data-take and mercator
+        mercator = extract_mercator(g.path)
+        # get credentials from file
+        downloader = Downloader("XX", "XX", root_path=working_path, date=(g.data_take, g.data_take),
+                                product_type="S2MSI1C", mercator_tiles=[mercator])
+        l1c_raster = None
+        necessary_bands = ["B01", "B02", "B04", "B05", "B08", "B8A", "B09", "B10", "B11", "B12"]
+        #  This is generalized download, in this case we expect only one iteration
+        for p in downloader.download_l1c(necessary_bands):
+            l1c_raster = p
+        # Data will be automatically resampled during the creation of the granule
+        l1c_granule = S2Granule(l1c_raster, 160, necessary_bands)
+
+        #  Cloudless time, compute mask
+        data = l1c_granule.stack_bands(necessary_bands) / 10000.0
+        #  swap
+        cloud_detector = S2PixelCloudDetector()
+        # CPL = cloud_detector.get_cloud_probability_maps(data)
+        cml = cloud_detector.get_cloud_masks(data)
+        #  Mask is in 160m spatial resolution, we need to up-sample to working spatial res.
+        cml = skimage.transform.resize(cml, order=0, output_shape=s2_get_resolution(g.spatial_resolution))
+        #  Since we can make use of this detector in per pixel let's not slice it automatically but based on granule
+        if g.slice_index > 1:
+            return slice_raster(g.slice_index, cml)
+        return cml
