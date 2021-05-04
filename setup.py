@@ -27,7 +27,8 @@ setup(
         "six==1.15.0",
         "scipy==1.6.1",
         "scikit-image==0.18.1",
-        "pandas==1.2.3"
+        "pandas==1.2.3",
+        "s2cloudless==1.5.0"
     ],
     packages=['Pipeline', 'Download'],
     include_package_data=True,
