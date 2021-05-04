@@ -69,7 +69,7 @@ class S2Detectors:
         #  We find the accompanying tile with data-take and mercator
         mercator = extract_mercator(g.path)
         # get credentials from file
-        downloader = Downloader("XX", "XX", root_path=working_path, date=(g.data_take, g.data_take),
+        downloader = Downloader("kristianson12", "mosvegcz", root_path=working_path, date=(g.data_take, g.data_take),
                                 product_type="S2MSI1C", mercator_tiles=[mercator])
         l1c_raster = None
         necessary_bands = ["B01", "B02", "B04", "B05", "B08", "B8A", "B09", "B10", "B11", "B12"]
