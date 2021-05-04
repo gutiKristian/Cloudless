@@ -2,6 +2,7 @@ import logging
 import os
 import skimage.transform
 
+from Download.DownloadExceptions import IncorrectInput
 from Pipeline.Granule import S2Granule
 from Pipeline.GranuleCalculator import GranuleCalculator
 import numpy as np
@@ -63,14 +64,22 @@ class S2Detectors:
         except NotImplementedError:
             log.error("Error while creating mask for {}".format(g.path))
             #  Automatically discarded (taken as cloudy)
-            return np.ones(shape=(s2_get_resolution(g.spatial_resolution)))
+            return np.ones(shape=(s2_get_resolution(g.spatial_resolution))) * 255  # no data
 
         #  Data preparation phase
         #  We find the accompanying tile with data-take and mercator
         mercator = extract_mercator(g.path)
         # get credentials from file
-        downloader = Downloader("kristianson12", "mosvegcz", root_path=working_path, date=(g.data_take, g.data_take),
+        try:
+            downloader = Downloader("kristianson12", "mosvegcz", root_path=working_path, date=(g.data_take, g.data_take),
                                 product_type="S2MSI1C", mercator_tiles=[mercator])
+        except IncorrectInput:
+            log.error("Did not find corresponding l1c this dataset wont be taken")
+            res = np.ones(shape=(s2_get_resolution(g.spatial_resolution))) * 255
+            if g.slice_index > 1:
+                return slice_raster(g.slice_index, res)
+            return res
+
         l1c_raster = None
         necessary_bands = ["B01", "B02", "B04", "B05", "B08", "B8A", "B09", "B10", "B11", "B12"]
         #  This is generalized download, in this case we expect only one iteration
