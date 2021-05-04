@@ -79,15 +79,19 @@ class S2Detectors:
         for p in downloader.download_l1c(necessary_bands):
             l1c_raster = p
         # Data will be automatically resampled during the creation of the granule
-        l1c_granule = S2Granule(l1c_raster, 160, necessary_bands)
+        l1c_granule = S2Granule(l1c_raster, 160, necessary_bands, granule_type="L1C")
 
         #  Cloudless time, compute mask
         data = l1c_granule.stack_bands(necessary_bands) / 10000.0
+        l1c_granule.free_resources()
+        data = np.swapaxes(data, 1, 2)
+        data = np.swapaxes(data, 2, 0)
         #  swap
         cloud_detector = S2PixelCloudDetector()
         # CPL = cloud_detector.get_cloud_probability_maps(data)
         cml = cloud_detector.get_cloud_masks(data)
         #  Mask is in 160m spatial resolution, we need to up-sample to working spatial res.
+        #  0 (no clouds), 1 (clouds), 255 (no data)
         cml = skimage.transform.resize(cml, order=0, output_shape=s2_get_resolution(g.spatial_resolution))
         #  Since we can make use of this detector in per pixel let's not slice it automatically but based on granule
         if g.slice_index > 1:

@@ -114,6 +114,7 @@ def is_supported_slice(index: int):
     Slice index: 5 = 20x20km
                 10 = 10x10km
                 15 =  6x6km (exactly 6.6)
+                # Only for 10m, 20m
                 18 =  5x5km (exactly 5.5)
                 45 =  2x2km (exactly  2.2)
     """
