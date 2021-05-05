@@ -78,3 +78,32 @@ class S2JIT:
                     doy[y, x] = doys[index]
                     result[:, y, x] = data[index][:, y, x]
         return result, doy
+
+    @staticmethod
+    @njit
+    def s2_cloud_probability_analysis(current_data, current_masks, current_doy, result, doy, final_mask) -> None:
+        """
+        Run over the data and pick the best pixel.
+        :param current_data: stacked data, sorted by the doy(date, ascending)
+        :param current_masks: L1C masks for the current data, for current_data[i] we have got current_masks[i]
+        :param current_doy: doy for current_data
+        :param result: intermediate array for result
+        :param doy: intermediate array for doy result
+        :param final_mask: intermediate array for probability mask result
+        :return: None, we directly manipulate the result, doy and final_mask
+        """
+        #  This is somewhat similar to the ndvi function
+        res_x, res_y = result.shape[1], result.shape[2]
+        for y in range(res_y):
+            for x in range(res_x):
+                _min_val = math.inf
+                index = 0
+                for i in range(len(current_masks)):
+                    #  do not take no data pixels and take the most recent pixels
+                    if 255 > current_masks[i][y, x] <= _min_val:
+                        _min_val = current_masks[i][y, x]
+                        index = i
+                if abs(_min_val - final_mask[y, x]) <= 20:
+                    final_mask[y, x] = _min_val
+                    result[:, y, x] = current_data[index][:, y, x]
+                    doy[y, x] = current_doy[index]
