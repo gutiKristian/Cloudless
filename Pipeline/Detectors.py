@@ -51,13 +51,15 @@ class S2Detectors:
         return 1.5 * (ndvi + 1)
 
     @staticmethod
-    def sentinel_cloudless(g: S2Granule) -> np.ndarray:
+    def sentinel_cloudless(g: S2Granule, probability: bool = False) -> np.ndarray:
         """
         Cloud detection based on machine learning algorithm by SentinelHub.
         Granule is identified and accompanying L1C dataset is downloaded and mas computed.
         In future we might save these mask and use them but for now we will download the data and compute the mask
         over and over.
         @param g - granule.
+        @param probability - if we want the function to return probability mask instead of 0,1,255 mask
+        :return: based on the probability parameter, we return either mask of 0,1,255 or probability mask <0, 255>
         """
         # Workspace preparation phase
         working_path = g.path + os.path.sep + "L1C"
@@ -97,18 +99,21 @@ class S2Detectors:
         l1c_granule.free_resources()
 
         cloud_detector = S2PixelCloudDetector()
-        # CPL = cloud_detector.get_cloud_probability_maps(data)
-        cml = cloud_detector.get_cloud_masks(data)
-        #  Mask is in 160m spatial resolution, we need to up-sample to working spatial res.
+        product = None
+        if probability:
+            product = cloud_detector.get_cloud_probability_maps(data)
+        else:
+            product = cloud_detector.get_cloud_masks(data)
+        #  Mask is in 160m spatial resolution, we need to up-sample to working spatial res., using nearest interpolation
         #  0 (no clouds), 1 (clouds), 255 (no data)
-        cml = skimage.transform.resize(cml, order=0, output_shape=s2_get_resolution(g.spatial_resolution))
+        product = skimage.transform.resize(product, order=0, output_shape=s2_get_resolution(g.spatial_resolution))
         # For some reason it marks no data as no cloud therefore we will filter them out with SCL
         nodata = g["SCL"] < 1
         if g.slice_index != 1:
             x, y = s2_get_resolution(g.spatial_resolution)
             nodata = glue_raster(nodata, y, x)
-        cml = np.ma.masked_array(data=cml, mask=nodata, fill_value=255).filled()
+        product = np.ma.masked_array(data=product, mask=nodata, fill_value=255).filled()
         #  Since we can make use of this detector in per pixel let's not slice it automatically but based on granule
         if g.slice_index > 1:
-            return slice_raster(g.slice_index, cml)
-        return cml
+            return slice_raster(g.slice_index, product)
+        return product
