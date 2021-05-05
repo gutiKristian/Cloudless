@@ -8,16 +8,18 @@ from Pipeline.GranuleCalculator import GranuleCalculator
 import numpy as np
 from Pipeline.logger import log
 from typing import List
-from Pipeline.utils import extract_mercator, s2_get_resolution, slice_raster
+from Pipeline.utils import extract_mercator, s2_get_resolution, slice_raster, glue_raster
 from Download.Sentinel2 import Downloader
 from skimage.exposure import rescale_intensity
 from s2cloudless import S2PixelCloudDetector
+from Pipeline.Plotting import Plot
 
 
 class S2Detectors:
     """
     Detectors for Per-Tile.
     """
+
     @staticmethod
     def scl(g: S2Granule) -> np.ndarray:
         """
@@ -71,8 +73,9 @@ class S2Detectors:
         mercator = extract_mercator(g.path)
         # get credentials from file
         try:
-            downloader = Downloader("kristianson12", "mosvegcz", root_path=working_path, date=(g.data_take, g.data_take),
-                                product_type="S2MSI1C", mercator_tiles=[mercator])
+            downloader = Downloader("kristianson12", "mosvegcz", root_path=working_path,
+                                    date=(g.data_take, g.data_take),
+                                    product_type="S2MSI1C", mercator_tiles=[mercator])
         except IncorrectInput:
             log.error("Did not find corresponding l1c this dataset wont be taken")
             res = np.ones(shape=(s2_get_resolution(g.spatial_resolution))) * 255
@@ -90,17 +93,21 @@ class S2Detectors:
         l1c_granule = S2Granule(l1c_raster, 160, necessary_bands, granule_type="L1C")
 
         #  Cloudless time, compute mask
-        data = l1c_granule.stack_bands(necessary_bands) / 10000.0
+        data = l1c_granule.stack_bands(necessary_bands, dstack=True) / 10000.0
         l1c_granule.free_resources()
-        data = np.swapaxes(data, 1, 2)
-        data = np.swapaxes(data, 2, 0)
-        #  swap
+
         cloud_detector = S2PixelCloudDetector()
         # CPL = cloud_detector.get_cloud_probability_maps(data)
         cml = cloud_detector.get_cloud_masks(data)
         #  Mask is in 160m spatial resolution, we need to up-sample to working spatial res.
         #  0 (no clouds), 1 (clouds), 255 (no data)
         cml = skimage.transform.resize(cml, order=0, output_shape=s2_get_resolution(g.spatial_resolution))
+        # For some reason it marks no data as no cloud therefore we will filter them out with SCL
+        nodata = g["SCL"] < 1
+        if g.slice_index != 1:
+            x, y = s2_get_resolution(g.spatial_resolution)
+            nodata = glue_raster(nodata, y, x)
+        cml = np.ma.masked_array(data=cml, mask=nodata, fill_value=255).filled()
         #  Since we can make use of this detector in per pixel let's not slice it automatically but based on granule
         if g.slice_index > 1:
             return slice_raster(g.slice_index, cml)
