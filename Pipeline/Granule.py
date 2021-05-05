@@ -1,5 +1,7 @@
 from datetime import datetime
 from xml.etree import ElementTree  # xml
+
+import numpy as np
 from osgeo import gdal
 from Pipeline.Band import *
 from Pipeline.utils import *
@@ -171,11 +173,12 @@ class S2Granule:
         """
         self.bands[self.spatial_resolution][name] = Band(path)
 
-    def stack_bands(self, desired_order: List[str] = None) -> np.ndarray:
+    def stack_bands(self, desired_order: List[str] = None, dstack: bool = False) -> np.ndarray:
         """
         Methods stacks all available bands.
         It forms a cube of bands.
         @param desired_order: user may set his order
+        @param dstack: whether to stack array along the third axis (used in ML predictions)
         WARNING: if no desired_order is specified, the order is random therefore might cause problems with the masking.
         """
         stack = []
@@ -184,7 +187,7 @@ class S2Granule:
         for key in desired_order:
             stack.append(self.bands[self.spatial_resolution][key].raster())
         log.info(f"STACK ORDER: {desired_order}")
-        return np.stack(stack)
+        return np.dstack(stack) if dstack else np.stack(stack)
 
     def get_initialized_bands(self) -> List[str]:
         if len(self.bands) == 0:
