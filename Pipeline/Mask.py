@@ -35,7 +35,7 @@ class S2JIT:
         """
         JIT-ed method for picking median, purpose is to avoid picking no data values with basic np.median.
         """
-        res_x, res_y = median_values.shape
+        res_y, res_x = median_values.shape
         for y in range(res_y):
             for x in range(res_x):
                 if median_values[y][x] == 0:
