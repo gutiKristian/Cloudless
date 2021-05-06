@@ -103,7 +103,9 @@ class S2JIT:
                     if 255 > current_masks[i][y, x] <= _min_val:
                         _min_val = current_masks[i][y, x]
                         index = i
-                if abs(_min_val - final_mask[y, x]) <= 20:
+                #  Take the latest pixel with threshold 20 compared with the current and
+                #  if the cloud prob. is less than 40 or if we have no-data on this position
+                if abs(_min_val - final_mask[y, x]) <= 20 and (_min_val < 40 or np.sum(result[:, y, x]) == 0):
                     final_mask[y, x] = _min_val
                     result[:, y, x] = current_data[index][:, y, x]
                     doy[y, x] = current_doy[index]
