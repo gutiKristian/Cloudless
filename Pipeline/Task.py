@@ -92,7 +92,7 @@ class S2CloudlessPerPixel(Task):
         result = np.ones(shape=(len(worker.output_bands), res_x, res_y), dtype=np.uint16)
         doy = np.zeros(shape=(res_x, res_y), dtype=np.uint16)
         #  We will provide probability mask as the result as well
-        final_mask = np.zeros(shape=(res_x, res_y), dtype=np.int)
+        final_mask = np.ones(shape=(res_x, res_y), dtype=np.int) * 255
         #  First thing, we will sort the granules based on their doy, so we get the latest result
         worker.granules.sort(key=lambda x: x.doy)
         #  Each iteration we are going to compute the mask and then run the jitted function on the data
