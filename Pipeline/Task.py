@@ -125,8 +125,6 @@ class S2CloudlessPerPixel(Task):
         return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands + ["rgb"])
 
 
-
-
 class MedianPerPixel(Task):
 
     @staticmethod
