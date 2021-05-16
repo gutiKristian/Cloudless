@@ -42,3 +42,9 @@ the sentinel's 2 data as a whole or individually. For instance, you might perfor
 - easily compute intermediate products such as NDVI, Agriculture index and more (more can be easily added)
 - easily compute masks/thresholding on custom band with a few lines of code, 
     - it's easy as : mask = GRANULE["B01"] > 100
+
+### Speed
+Even though Python does not belong to the set of fast langues. The pipeline is from the very beginning being built
+with aimt to reach maximum speed and memory optimizations within the computations. This allows us to run multiple pipelines workers simultaneously and push the effectivity even further. Speaking of speed pipeline uses rasterio library built on top of GDAL, to open the JPEG2000 imagery. Decoding is done by openjpeg library witihin these modules and supports multithreading.
+Regarding memory, optimizations have been made in the process of creating cloudless products, user is able to pick the number of 
+maximum opened datasets within the computation. This is big news for users with laptops that have limited RAM and as we know these datasets are sometimes pretty big even for 16GB of RAM.
