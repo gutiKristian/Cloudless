@@ -60,7 +60,7 @@ class S2Worker:
 
     def _validate_files_by_mercator(self) -> None:
         if len(self.datasets) < 2:
-            raise Exception("Not enough files to execute, exactly: {}".format(len(self.datasets)))
+            log.warning("Not enough files to execute cloudless jobs")
         if self.mercator == "":
             self.mercator = extract_mercator(self.datasets[0])
         for file in self.datasets:
@@ -95,8 +95,8 @@ class S2Worker:
         """
         Load each band in each granule.
         """
-        for worker in self.granules:
-            worker.load_bands(desired_bands)
+        for granule in self.granules:
+            granule.load_bands(desired_bands)
 
     def release_bands(self):
         """
