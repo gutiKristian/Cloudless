@@ -1,7 +1,15 @@
 image: "python:3.7"
 
 
-before_script:
+stages:
+  - Test
+  - Dependency Scanning
+
+include:
+  - template: Dependency-Scanning.gitlab-ci.yml
+
+pytest:
+  before_script:
   - python --version
   - apt-get update -y
   - apt-get install build-essential -y
@@ -14,16 +22,6 @@ before_script:
   - pip install GDAL=="`gdal-config --version`"
   - pip install wheel
   - pip install -r requirements.txt
-
-
-stages:
-  - Test
-  - Dependency Scanning
-
-include:
-  - template: Dependency-Scanning.gitlab-ci.yml
-
-pytest:
   stage: Test
   script:
   - python -m pytest tests/TestUtils.py
