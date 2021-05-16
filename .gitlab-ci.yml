@@ -1,15 +1,6 @@
 image: "python:3.7"
 
-
-stages:
-  - Test
-  - Dependency Scanning
-
-include:
-  - template: Dependency-Scanning.gitlab-ci.yml
-
-pytest:
-  before_script:
+before_script:
   - python --version
   - apt-get update -y
   - apt-get install build-essential -y
@@ -22,11 +13,12 @@ pytest:
   - pip install GDAL=="`gdal-config --version`"
   - pip install wheel
   - pip install -r requirements.txt
+
+stages:
+  - Test
+
+
+pytest:
   stage: Test
   script:
   - python -m pytest tests/TestUtils.py
-
-dependency_scanning:
-  stage: Dependency Scanning
-  variables:
-    CI_DEBUG_TRACE: "true"
