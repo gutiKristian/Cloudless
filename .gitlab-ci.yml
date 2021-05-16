@@ -1,5 +1,6 @@
 image: "python:3.7"
 
+
 before_script:
   - python --version
   - apt-get update -y
@@ -17,8 +18,17 @@ before_script:
 
 stages:
   - Test
+  - Dependency Scanning
+
+include:
+  - template: Dependency-Scanning.gitlab-ci.yml
 
 pytest:
   stage: Test
   script:
   - python -m pytest tests/TestUtils.py
+
+dependency_scanning:
+  stage: Dependency Scanning
+  variables:
+    CI_DEBUG_TRACE: "true"
