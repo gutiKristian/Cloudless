@@ -1,5 +1,7 @@
 from datetime import datetime
 from xml.etree import ElementTree  # xml
+
+import numpy as np
 from osgeo import gdal
 from Pipeline.Band import *
 from Pipeline.utils import *
@@ -10,14 +12,18 @@ gdal.UseExceptions()
 
 class S2Granule:
 
-    def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1, t_srs: str = 'EPSG:32633'):
+    def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1,
+                t_srs: str = 'EPSG:32633',  granule_type: str = "L2A"):
         if not is_dir_valid(path):
             raise FileNotFoundError("Dataset has not been found !")
+        if not supported_granule_type(granule_type):
+            raise ValueError("This granule type is not supported !")
         self.path = path
+        self.granule_type = granule_type
         self.spatial_resolution = spatial_res
         self.desired_bands = desired_bands
         self.t_srs = t_srs
-        self.meta_data_path = self.path + os.path.sep + "MTD_MSIL2A.xml"
+        self.meta_data_path = self.path + os.path.sep + ("MTD_MSIL2A.xml" if granule_type == "L2A" else "MTD_MSIL1C.xml")
         self.meta_data_gdal = None
         self.meta_data = None
         self.data_take = None
@@ -31,9 +37,9 @@ class S2Granule:
         self.bands = self.__to_band_dictionary()
         self.cloud_index = 0
         self.temp = {}
-        log.info(f"Initialized worker: {self.path}\n{self}")
+        log.info(f"Initialized granule:\n{self}")
 
-    def __find_images(self):
+    def __find_images(self) -> None:
         """
         Methods tries to find images in the granule directory.
         If meta data file is present, it grabs paths and validate if they exist.
@@ -42,12 +48,14 @@ class S2Granule:
         images in the directory. The same is done if the meta data file was not provided.
         """
         if self.meta_data_gdal is None:
-            log.info(f"MTDMSIL2A.xml has not been found in {self.path}")
+            log.info(f"{self.granule_type} meta-data has not been found in {self.path}")
+            # Sentinel images are encoded with JPEG2000 but some processing might have been done so we check for tif too
             self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
             if len(self.paths_to_raster) == 0:
                 self.paths_to_raster = get_files_in_directory(self.path, '.tif')
             return
-        log.info(f"MTDMSIL2A.xml has been found in {self.path}")
+        log.info(f"{os.path.basename(self.meta_data_path)} has been found in {self.path}")
+        #  Extract images from xml
         tree = ElementTree.parse(self.meta_data_path)
         root = tree.getroot()
         images = []
@@ -56,13 +64,10 @@ class S2Granule:
             if os.name == 'nt':
                 text = text.replace('/', '\\')
             images.append(self.path + os.sep + text + '.jp2')
-        #  [0:7] - 10m, [7:20] - 20m, [20::] - 60m
-        if self.spatial_resolution == 10:
-            self.paths_to_raster = images[0:7]
-        elif self.spatial_resolution == 20:
-            self.paths_to_raster = images[7:20]
-        else:
-            self.paths_to_raster = images[20::]
+        #  Take only bands we are "looking for"
+        self.paths_to_raster = self.__extract_bands(images)
+
+        #  Especially useful when we download meta-data file and only selected bands
         if not is_file_valid(self.paths_to_raster[0]):
             log.info("File found in meta-data do not exist...\nChecking the directory...")
             self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
@@ -84,10 +89,9 @@ class S2Granule:
             e_dict[self.spatial_resolution] = {}
         for band in self.paths_to_raster:
             key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL|rgb|DOY', band)
-            if len(key) != 0:
-                key = key[-1]
-            # TODO: is it necessary ?... maybe we'd like to init every available band (this should be independent
-            #  from output bands)
+            if len(key) == 0:
+                pass
+            key = key[-1]
             if key in self.desired_bands:
                 b = Band(band, slice_index=self.slice_index)
                 if b.profile["width"] != s2_get_resolution(self.spatial_resolution)[0]:
@@ -99,7 +103,7 @@ class S2Granule:
         log.info("All necessary bands are present...Continue")
         return e_dict
 
-    def __initialize_meta(self):
+    def __initialize_meta(self) -> None:
         try:
             self.meta_data_gdal = gdal.Open(self.meta_data_path)
             self.meta_data = self.meta_data_gdal.GetMetadata()
@@ -110,6 +114,20 @@ class S2Granule:
         except Exception as e:
             log.warning("Worker continues without metadata file!")
 
+    def __extract_bands(self, paths) -> List[str]:
+        """
+        Util method for extracting bands that have been found inside the granule folder,
+        for L2A it is done based on the spatial resolution and for L1C data all of available bands are picked.
+        """
+        if self.granule_type == "L1C":
+            return paths
+        #  L2A [0:7] - 10m, [7:20] - 20m, [20::] - 60m
+        if self.spatial_resolution == 10:
+            return paths[0:7]
+        elif self.spatial_resolution == 20:
+            return paths[7:20]
+        return paths[20::]
+
     def get_image_resolution(self) -> Tuple[int, int]:
         if self.spatial_resolution == 10:
             return 10980, 10980
@@ -117,10 +135,17 @@ class S2Granule:
             return 5490, 5490
         return 1830, 1830
 
-    def add_another_band(self) -> None:
-        pass  # TODO: RESAMPLE AND UPDATE THE DICT AND DESIRED BANDS OR HOWEVER IT IS CALLED NOW
+    def add_another_band(self, path_to_band: str, key: str) -> None:
+        """
+        :param path_to_band - path to the raster data
+        :param key - used for lookup inside granule
+        """
+        b = Band(path_to_band, slice_index=self.slice_index)
+        if b.profile["width"] != s2_get_resolution(self.spatial_resolution)[0]:
+            b.resample(s2_get_resolution(self.spatial_resolution)[0] / b.profile["width"], delete=True)
+        self.bands[self.spatial_resolution][key] = b
 
-    def load_bands(self, desired_bands: List[str] = None):
+    def load_bands(self, desired_bands: List[str] = None) -> None:
         """
         Method for loading the raster data into memory. Exists to avoid loading at the
         instantiation.
@@ -133,13 +158,14 @@ class S2Granule:
 
     def free_resources(self) -> None:
         """
-        Release the bands numpy arrays. Not the temp!
+        Release the bands numpy arrays! With the TEMPS
         :return: None
         """
         for band in self.bands[self.spatial_resolution].values():
             band.free_resources()
+        self.temp = {}
 
-    def update_worker(self, name: str, path: str):
+    def update_worker(self, name: str, path: str) -> None:
         """
         Register new file in worker.
         :param name: represents the file in the worker class
@@ -147,11 +173,12 @@ class S2Granule:
         """
         self.bands[self.spatial_resolution][name] = Band(path)
 
-    def stack_bands(self, desired_order: List[str] = None) -> np.ndarray:
+    def stack_bands(self, desired_order: List[str] = None, dstack: bool = False) -> np.ndarray:
         """
         Methods stacks all available bands.
         It forms a cube of bands.
         @param desired_order: user may set his order
+        @param dstack: whether to stack array along the third axis (used in ML predictions)
         WARNING: if no desired_order is specified, the order is random therefore might cause problems with the masking.
         """
         stack = []
@@ -160,7 +187,7 @@ class S2Granule:
         for key in desired_order:
             stack.append(self.bands[self.spatial_resolution][key].raster())
         log.info(f"STACK ORDER: {desired_order}")
-        return np.stack(stack)
+        return np.dstack(stack) if dstack else np.stack(stack)
 
     def get_initialized_bands(self) -> List[str]:
         if len(self.bands) == 0:
@@ -174,7 +201,7 @@ class S2Granule:
         for band in self.bands[self.spatial_resolution].values():
             band.band_reproject(t_srs=target_projection)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> Band:
         """
         The band that will be returned is band with the active
         spatial resolution
@@ -184,4 +211,6 @@ class S2Granule:
         return self.bands[self.spatial_resolution][item]
 
     def __str__(self):
-        return f"Bands: {self.bands}\nDoy: {self.doy}"
+        return f"Granule: {os.path.basename(os.path.normpath(self.path))}\n" \
+               f"Bands: {self.desired_bands}\nDoy: {self.doy}" \
+               f"Granule type: {self.granule_type}"

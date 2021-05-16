@@ -25,9 +25,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 class Downloader:
     manifest_url = "https://dhr1.cesnet.cz/odata/v1/Products('{}')/Nodes('{}.SAFE')/Nodes('manifest.safe')/$value"
-    meta_url = "https://dhr1.cesnet.cz/odata/v1/Products('{}')/Nodes('{}.SAFE')/Nodes('MTD_MSIL2A.xml')/$value"
+    meta_url = "https://dhr1.cesnet.cz/odata/v1/Products('{}')/Nodes('{}.SAFE')/Nodes('{}')/$value"
     raster_url = "https://dhr1.cesnet.cz/odata/v1/Products('{}')/Nodes('{}.SAFE')/Nodes('GRANULE')/" \
                  "Nodes('{}')/Nodes('IMG_DATA')/Nodes('R{}')/Nodes('{}.jp2')/$value"
+    raster_url_l1c = "https://dhr1.cesnet.cz/odata/v1/Products('{}')/Nodes('{}.SAFE')/Nodes('GRANULE')/" \
+                 "Nodes('{}')/Nodes('IMG_DATA')/Nodes('{}.jp2')/$value"
 
     def __init__(self, user_name: str, password: str, root_path: str = None, polygon: List = None,
                  date: datetime = (datetime.datetime.now() - datetime.timedelta(days=14), datetime.datetime.now()),
@@ -35,6 +37,7 @@ class Downloader:
                  mercator_tiles: List[str] = None, text_search: str = None, platform_name: str = "Sentinel-2",
                  time_str: str = None):
         """
+        TODO: path to credentials folder
         It is recommended to initialize object via class methods to prevent unexpected results for the user.
         Rules:
             - polygon is always taken as the highest priority argument for the datasets look up, following uuid and
@@ -66,12 +69,13 @@ class Downloader:
         if not Downloader.is_valid_cloud_cov(cloud_coverage):
             raise IncorrectInput("Bad format: cloud coverage.")
         self.cloud_coverage = cloud_coverage
-        if not Downloader.is_valid_date_range(date):
-            raise IncorrectInput("Bad format: date")
+        # if not Downloader.is_valid_date_range(date):
+        #     raise IncorrectInput("Bad format: date")
         self.date = date
         self.product_type = product_type
         self.tile_uuids = uuid
-        self.mercator_tiles = Downloader.validate_mercator_tiles(mercator_tiles)
+        self.mercator_tiles = []
+        self.validate_mercator_tiles(mercator_tiles)
         self.text_search = text_search
         self.platform_name = platform_name  # even though this is Sentinel2.py we may extract this class someday
         #  After successful initialization of Downloader, obj_cache contains: formatted string for cloud, time and
@@ -83,6 +87,39 @@ class Downloader:
         self.__minimum_requirements()
 
     #  'Public'
+
+    def download_l1c(self, bands):
+        if self.product_type != "S2MSI1C":
+            raise ValueError("Bad product type")
+        self.__before_download()
+        status = True
+        for mercator, entries in self.__get_next_download():
+            working_path = self.root_path + mercator
+            Downloader.prepare_dir(working_path)
+            for entry in entries:
+                data_set_path = working_path + os.path.sep + entry['title'] + ".SAFE" + os.path.sep
+                Downloader.prepare_dir(data_set_path)
+                manifest = self.download_meta_data(Downloader.manifest_url.format(entry["id"], entry["title"]),
+                                                   data_set_path + "manifest.safe")
+                manifest_imgs = Downloader.parse_manifest(manifest)
+                meta_data = self.download_meta_data(Downloader.meta_url.format(entry["id"], entry["title"], "MTD_MSIL1C.xml"),
+                                                    data_set_path + "MTD_MSIL1C.xml")
+                raster_urls = Downloader.get_raster_urls_l1c(meta_data, entry, bands)
+                futures = []
+                with ThreadPoolExecutor(max_workers=10) as executor:
+                    for url, name in raster_urls:
+                        check_sum = self.__extract_check_sum(name, manifest_imgs)
+                        futures.append(executor.submit(self.download_file, url, data_set_path + name + ".jp2",
+                                                       check_sum=check_sum))
+                for f in futures:
+                    status = status and f.result()
+                if not status:
+                    log.warning("Corrupted download this dataset will be discarded.")
+                    shutil.rmtree(data_set_path)
+                else:
+                    log.debug("Check sum OK!")
+            yield working_path
+            log.info("All downloaded")
 
     def download_meta_data(self, url, filepath) -> str:
         """
@@ -110,6 +147,18 @@ class Downloader:
             result.append((Downloader.raster_url.format(entry["id"], entry["title"], m.group(1),
                                                         spatial, m.group(2)), m.group(2)))
         return bands
+
+    @staticmethod
+    def get_raster_urls_l1c(meta, entry, bands):
+        bands = set(bands)
+        raster_urls = []
+        pattern = re.compile(r'<IMAGE_FILE>GRANULE/(L1C_[0-9A-Z_]+)/IMG_DATA/(([0-9A-Z_]+)_([0-9A-Z_]{03}))</IMAGE_FILE>')
+        for m in re.finditer(pattern, meta):
+            if not len(bands.intersection({m.group(4)})) > 0:
+                continue
+            bands = bands - {m.group(4)}
+            raster_urls.append((Downloader.raster_url_l1c.format(entry["id"], entry["title"], m.group(1), m.group(2)), m.group(2)))
+        return raster_urls
 
     def get_raster_urls(self, meta, entry, spatial_res, bands):
         """
@@ -196,7 +245,8 @@ class Downloader:
             raise ValueError("Wrong spatial resolution")
         self.__before_download()
         if bands is None:
-            bands = bands_for_resolution(primary_spatial_res)
+            prim = 60 if primary_spatial_res == "60m" else (20 if primary_spatial_res == "20m" else 10)
+            bands = bands_for_resolution(prim)
         status = True  # If the dataset health is ok
         for mercator, entries in self.__get_next_download():
             working_path = self.root_path + mercator  # path where all datasets are going to be downloaded
@@ -207,7 +257,7 @@ class Downloader:
                 manifest = self.download_meta_data(Downloader.manifest_url.format(entry["id"], entry["title"]),
                                                    data_set_path + "manifest.safe")
                 manifest_imgs = Downloader.parse_manifest(manifest)
-                meta_data = self.download_meta_data(Downloader.meta_url.format(entry["id"], entry["title"]),
+                meta_data = self.download_meta_data(Downloader.meta_url.format(entry["id"], entry["title"], "MTD_MSIL2A.xml"),
                                                     data_set_path + "MTD_MSIL2A.xml")
                 raster_urls = self.get_raster_urls(meta_data, entry, primary_spatial_res, bands)
                 futures = []
@@ -415,24 +465,23 @@ class Downloader:
             log.warning(f"Provided cloud coverave interval is small, there may be fewer result or even None")
         return True
 
-    @staticmethod
-    def is_valid_date_range(date: Tuple) -> bool:
-        if date is None or len(date) != 2 or (date[1] - date[0]).days < 0:
-            return False
-        return True
+    # @staticmethod
+    # def is_valid_date_range(date: Tuple) -> bool:
+    #     if date is None or len(date) != 2 or (date[1] - date[0]).days < 0:
+    #         return False
+    #     return True
 
-    @staticmethod
-    def validate_mercator_tiles(tiles: List[str]) -> List[str]:
+    def validate_mercator_tiles(self, tiles: List[str]) -> List[str]:
         if tiles is None:
             return []
-        r = re.compile("^[\d]{1,2}[A-Z]{0,3}")
+        r = re.compile("^(T?)[\\d]{1,2}[A-Z]{0,3}")
         validated = []
         for entry in tiles:
-            if len(entry) == 5 and r.search(entry):
+            if r.search(entry):
                 validated.append(entry)
             else:
                 log.warning(f"BAD FORMAT: {entry} is not a tile, it won't be included in the tiles to download!")
-        return validated
+        self.mercator_tiles = validated
 
     @staticmethod
     def un_zip(path):

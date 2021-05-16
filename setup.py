@@ -8,7 +8,7 @@ setup(
     #   - MAJOR VERSION 0
     #   - MINOR VERSION 1
     #   - MAINTENANCE VERSION 0
-    version='0.9.7',
+    version='1.1.10',
     description='Pipeline for creating cloudless pictures from Sentinel-2 images',
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -27,7 +27,8 @@ setup(
         "six==1.15.0",
         "scipy==1.6.1",
         "scikit-image==0.18.1",
-        "pandas==1.2.3"
+        "pandas==1.2.3",
+        "s2cloudless==1.5.0"
     ],
     packages=['Pipeline', 'Download'],
     include_package_data=True,

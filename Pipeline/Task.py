@@ -1,5 +1,8 @@
 import gc
 from abc import ABC, abstractmethod
+
+import rasterio
+
 from Pipeline.logger import log
 from Pipeline.Worker import S2Worker
 from Pipeline.GranuleCalculator import GranuleCalculator
@@ -9,6 +12,7 @@ from Pipeline.Granule import S2Granule
 from Pipeline.utils import *
 from numba.typed import List as LIST
 from Pipeline.Mask import S2JIT
+from Pipeline.Detectors import S2Detectors
 
 
 class Task(ABC):
@@ -49,7 +53,7 @@ class NdviPerPixel(Task):
                 GranuleCalculator.s2_ndvi(w)
                 # TODO: take mask as function (like per-tile)
                 mask = (w["B02"] > 100) & (w["B04"] > 100) & (w["B8A"] > 500) & (w["B8A"] < 8000) & (w["AOT"] < 100)
-                ndvi_arrays[i] = np.ma.array(w.temp["NDVI"], mask=mask, fill_value=0).filled()
+                ndvi_arrays[i] = np.ma.array(w.temp["NDVI"], mask=~mask, fill_value=-1).filled()
                 del mask
                 current_data.append(w.stack_bands(worker.output_bands))
                 w.free_resources()  # We have copied the resources to the new numpy array inside current_data
@@ -73,10 +77,97 @@ class NdviPerPixel(Task):
         return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands + ["rgb"])
 
 
+class S2CloudlessPerPixel(Task):
+
+    @staticmethod
+    def perform_computation(worker: S2Worker, constraint: int = 10) -> S2Granule:
+        """
+        This method uses the s2cloudless algorithm provided by sentinel hub to mask the images.
+        Uses the detector that is also used for the per-tile.
+        :param worker: s2worker with data
+        :param constraint: how many mask we allow to be opened at the same time
+        :return: masked granule
+        """
+        res_x, res_y = s2_get_resolution(worker.spatial_resolution)
+        result = np.ones(shape=(len(worker.output_bands), res_x, res_y), dtype=np.uint16)
+        doy = np.zeros(shape=(res_x, res_y), dtype=np.uint16)
+        #  We will provide probability mask as the result as well
+        final_mask = np.ones(shape=(res_x, res_y), dtype=np.int) * 255
+        #  First thing, we will sort the granules based on their doy, so we get the latest result
+        worker.granules.sort(key=lambda x: x.doy)
+        #  Each iteration we are going to compute the mask and then run the jitted function on the data
+        log.info(f"{(len(worker.granules) - 1) // constraint + 1} iteration(s) expected!")
+        for iteration in range((len(worker.granules) - 1) // constraint + 1):
+            current_doy = LIST()
+            current_masks = LIST()  # mind these are probability masks !!
+            current_data = LIST()
+            # Acquire first batch of granules, for instance constraint=4, granules=[0,1,2,3]
+            granules = worker.granules[iteration * constraint: (iteration + 1) * constraint]
+            for i, g in enumerate(granules, 0):
+                current_doy.append(g.doy)
+                current_masks.append(S2Detectors.sentinel_cloudless(g, probability=True))
+                current_data.append(g.stack_bands(worker.output_bands))
+            S2JIT.s2_cloud_probability_analysis(current_data, current_masks, current_doy, result, doy, final_mask)
+            del current_data
+            del current_masks
+        log.info("Masking done")
+        gc.collect()
+        # Init
+        for i, band in enumerate(worker.output_bands, 0):
+            worker.result[band] = result[i]
+        worker.result["DOY"] = doy
+        log.info("Saving result to the files...")
+        worker._save_result()  # Save result into files
+        r, g, b = extract_rgb_paths(worker.save_result_path)
+        create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
+        worker.release_bands()
+        # If there's an intention to work further with the files
+        return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands + ["rgb"])
+
+
+class MedianPerPixel(Task):
+
+    @staticmethod
+    def perform_computation(worker: S2Worker) -> S2Granule:
+        """
+        This method takes the median of all the pixels.
+        """
+        log.info(f"Running per-pixel median masking. Dataset {worker.main_dataset_path}")
+        log.info(f"Picked bands: {worker.output_bands}, expected iterations: {len(worker.output_bands)}")
+        res_x, res_y = s2_get_resolution(worker.spatial_resolution)
+        for i, band_key in enumerate(worker.output_bands, 0):
+            #  Reference object for yielding size of window block, since the blocks might not be same in each iteration
+            #  this is the best of possible ways to get the block
+            reference_object = worker.granules[0][band_key].path
+            worker.result[band_key] = np.ones(shape=(res_x, res_y), dtype=np.uint16)
+            with rasterio.open(reference_object) as reference:
+                for ji, window in reference.block_windows(1):
+                    current_blocks = LIST()  # array of blocks where for each pixel median is picked
+                    for j, granule in enumerate(worker.granules, 0):
+                        current_blocks.append(granule[band_key].rasterio_ref().read(1, window=window))
+                    data = np.stack(current_blocks)
+                    median_values = np.median(data, axis=0)
+                    res = S2JIT.s2_median_analysis(data, median_values)
+                    del data
+                    # current_blocks is filled now get the median
+                    worker.result[band_key][window.row_off:window.row_off + window.height,
+                    window.col_off:window.col_off + window.width] = res
+            log.info(f"{band_key} done.")
+        log.info("Saving result to the files...")
+        worker._save_result()  # Save result into files
+        r, g, b = extract_rgb_paths(worker.save_result_path)
+        create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
+        log.info("Done!")
+        worker.release_bands()
+        # If there's an intention to work further with the files
+        # Return result Granule
+        return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands + ["rgb"])
+
+
 class PerTile(Task):
 
     @staticmethod
-    def perform_computation(worker: S2Worker, detector=GranuleCalculator.s2_cloud_mask_scl) -> S2Granule:
+    def perform_computation(worker: S2Worker, detector=S2Detectors.scl) -> S2Granule:
         log.info(f"Running per-tile masking. Dataset {worker.main_dataset_path}")
         # Gather information
         res_x, res_y = s2_get_resolution(worker.spatial_resolution)

@@ -30,6 +30,7 @@ class Band:
         self._was_raster_read = False
         if load_on_init:
             self.load_raster()
+        self.__rasterio_reference = None
 
     def load_raster(self) -> None:
         """
@@ -43,6 +44,14 @@ class Band:
         self._was_raster_read = True
         if self.slice_index > 1:
             self.raster_image = slice_raster(self.slice_index, self.raster_image)
+
+    def rasterio_ref(self):
+        """
+        Used within median to avoid frequent opening and closing.
+        """
+        if self.__rasterio_reference is None:
+            self.__rasterio_reference = rasterio.open(self.path)
+        return self.__rasterio_reference
 
     def raster(self) -> np.array:
         """
@@ -64,8 +73,9 @@ class Band:
         new_path, _ = os.path.splitext(self.path)
         new_path += '.tif'
         # GDAL version
-        process = subprocess.Popen(f"gdalwarp \"{self.path}\" -s_srs {self.profile['crs']} -t_srs {t_srs} \"{new_path}\"",
-                                   shell=True)
+        process = subprocess.Popen(
+            f"gdalwarp \"{self.path}\" -s_srs {self.profile['crs']} -t_srs {t_srs} \"{new_path}\"",
+            shell=True)
         process.wait()
         # with rasterio.open(self.path) as src:
         #     transform, width, height = calculate_default_transform(src.crs, t_srs, src.width, src.height, *src.bounds)
@@ -104,7 +114,7 @@ class Band:
                     int(dataset.height * sample_factor),
                     int(dataset.width * sample_factor)
                 ),
-                resampling=rasterio.enums.Resampling.bilinear
+                resampling=rasterio.enums.Resampling.nearest
             )
             height = dataset.height * sample_factor
             width = dataset.width * sample_factor
@@ -129,6 +139,10 @@ class Band:
         """
         self.raster_image = None
         self._was_raster_read = False
+
+    def __del__(self):
+        if self.__rasterio_reference is not None:
+            self.__rasterio_reference.close()
 
     def __gt__(self, other: int):
         """

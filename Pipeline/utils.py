@@ -73,13 +73,15 @@ def extract_mercator(path: str) -> str:
 
 
 def s2_get_resolution(spatial):
-    if not s2_is_spatial_correct(spatial):
-        raise Exception("This spatial resolution does not exist in the sentinel 2 context")
     if spatial == 10:
         return 10980, 10980
     if spatial == 20:
         return 5490, 5490
-    return 1830, 1830
+    elif spatial == 60:
+        return 1830, 1830
+    log.info("Spatial not present, calculating on the fly...")
+    val = spatial / 10
+    return 10980 / val, 10980 / val
 
 
 def look_up_raster(node, element):
@@ -98,7 +100,11 @@ def bands_for_resolution(spatial_resolution):
         return ["B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B11", "B12", "AOT", "SCL"]
     elif spatial_resolution == 10:
         return ["B02", "B03", "B04", "B08", "AOT"]
-    return ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B09", "B11", "B12", "AOT"]  # 60
+    return ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B8A", "B09", "B11", "B12", "AOT", "SCL"]  # 60
+
+
+def s2_l1c_bands():
+    return ["B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B09", "B10", "B11", "B12"]
 
 
 # --------------- BAND UTILS ---------------
@@ -108,6 +114,7 @@ def is_supported_slice(index: int):
     Slice index: 5 = 20x20km
                 10 = 10x10km
                 15 =  6x6km (exactly 6.6)
+                # Only for 10m, 20m
                 18 =  5x5km (exactly 5.5)
                 45 =  2x2km (exactly  2.2)
     """
@@ -137,7 +144,7 @@ def ndvi(red: numpy.ndarray, nir: numpy.ndarray) -> numpy.ndarray:
 
 def slice_raster(index: int, image: numpy.ndarray) -> numpy.ndarray:
     """
-    Modifies the image, in-situ function.
+    Modifies the image.
     :param index - slicing index
     :param image - reference to the base image
     :return: sliced image
@@ -180,9 +187,10 @@ def rescale_intensity(image, _min, _max):
 
 
 def create_rgb_uint8(r, g, b, path, tile):
-    red = rescale_intensity(rasterio.open(r).read(1), 0, 4096)
-    green = rescale_intensity(rasterio.open(g).read(1), 0, 4096)
-    blue = rescale_intensity(rasterio.open(b).read(1), 0, 4096)
+    gain = 1.5
+    red = rescale_intensity(rasterio.open(r).read(1) * gain, 0, 4096)
+    green = rescale_intensity(rasterio.open(g).read(1) * gain, 0, 4096)
+    blue = rescale_intensity(rasterio.open(b).read(1) * gain, 0, 4096)
 
     rgb_profile = rasterio.open(r).profile
     rgb_profile['dtype'] = 'uint8'
@@ -203,7 +211,6 @@ def create_rgb_uint8(r, g, b, path, tile):
         dst.update_tags(ns='rio_overview', resampling='nearest')
 
 
-
 def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", rgb=False, **kwargs) -> None:
     """
     Build mosaic from files. Using gdal vrt.
@@ -215,7 +222,8 @@ def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", rgb=F
     _destination = format_path(destination) + "mosaic.vrt"
     final_image = format_path(destination) + name + ".tif"
     escaped_paths = " ".join(f'"{p}"' for p in paths)
-    process = subprocess.Popen(f"gdalbuildvrt -q \"{_destination}\" {escaped_paths}", shell=True, stdout=subprocess.PIPE)
+    process = subprocess.Popen(f"gdalbuildvrt -q \"{_destination}\" {escaped_paths}", shell=True,
+                               stdout=subprocess.PIPE)
     process.wait()
     #  Experiment, NOTE: TILED is making artefacts on monochromatic pictures!
     if rgb:
@@ -225,8 +233,9 @@ def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", rgb=F
                                    stdout=subprocess.PIPE)
         process.wait()
     else:
-        process = subprocess.Popen(f"gdal_translate -of GTiff -co \"TILED=YES\" \"{_destination}\" \"{final_image}\" -q",
-                                   shell=True, stdout=subprocess.PIPE)
+        process = subprocess.Popen(
+            f"gdal_translate -of GTiff -co \"TILED=YES\" \"{_destination}\" \"{final_image}\" -q",
+            shell=True, stdout=subprocess.PIPE)
         process.wait()
     process = subprocess.Popen(f"rm \"{_destination}\"", shell=True, stdout=subprocess.PIPE)
     process.wait()
@@ -284,3 +293,21 @@ def verify_bands(img_paths: List[str], found_imgs: List[str], desired_bands: Lis
         if len(desired_bands) == 0:
             return found_imgs
     return found_imgs
+
+
+def profile_for_rgb(profile: rasterio.profiles.Profile) -> rasterio.profiles.Profile:
+    """
+    Modify rasterio profile for RGB image.
+    """
+    profile['dtype'] = 'uint8'
+    profile['count'] = 3
+    profile['photometric'] = "RGB"
+    profile['driver'] = "GTiff"
+    profile['blockxsize'] = 256
+    profile['blockysize'] = 256
+    profile['nodata'] = 0
+    return profile
+
+
+def supported_granule_type(_type: str) -> bool:
+    return _type in ["L1C", "L2A"]
