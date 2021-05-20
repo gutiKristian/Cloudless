@@ -67,16 +67,20 @@ class S2Worker:
             if extract_mercator(file) != self.mercator:
                 raise Exception("Tiles with different area detected")
 
-    # TODO: CHANGE TO "PUBLIC" after refactor
     def _save_result(self) -> None:
+        """
+        Save the results inside result dict to raster files.
+        @return: None
+        """
         try:
             os.mkdir(self.save_result_path)
         except FileExistsError:
+            log.warning("Result directory already exists. File will be deleted.")
             shutil.rmtree(self.save_result_path)
             os.mkdir(self.save_result_path)
-            log.warning("Result directory already exists. File will be deleted.")
         # projection = list(self.granules[-1].bands[self.spatial_resolution].values())[0].projection
         # geo_transform = list(self.granules[-1].bands[self.spatial_resolution].values())[0].geo_transform
+        # Fetch random profile from the bands
         profile = list(self.granules[-1].bands[self.spatial_resolution].values())[0].profile
         log.debug(f"Profile: {profile}")
         log.debug(f"Loaded from  {list(self.granules[-1].bands[self.spatial_resolution].values())[0].path}")
@@ -86,10 +90,6 @@ class S2Worker:
                 executor.submit(GranuleCalculator.save_band_rast, self.result[key], path=path, prof=profile,
                                 driver="GTiff",
                                 dtype=rastTypes.uint16)
-                # GranuleCalculator.save_band_rast(self.result[key], path=path, prof=profile, driver="GTiff",
-                #                              dtype=rastTypes.uint16)
-            # GranuleCalculator.save_band(raster_img=self.result[key], name=key + "_" + str(self.spatial_resolution),
-            #                             path=path, projection=projection, geo_transform=geo_transform)
 
     def _load_bands(self, desired_bands: List[str] = None):
         """

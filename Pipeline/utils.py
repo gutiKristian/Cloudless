@@ -73,6 +73,11 @@ def extract_mercator(path: str) -> str:
 
 
 def s2_get_resolution(spatial):
+    """
+    Return image size for that spatial res.
+    @param spatial:
+    @return:
+    """
     if spatial == 10:
         return 10980, 10980
     if spatial == 20:

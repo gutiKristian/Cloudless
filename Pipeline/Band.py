@@ -69,7 +69,6 @@ class Band:
         @param t_srs: target srs
         @param delete: delete source file after the reprojection
         """
-        # rasterio version
         new_path, _ = os.path.splitext(self.path)
         new_path += '.tif'
         # GDAL version
@@ -77,6 +76,7 @@ class Band:
             f"gdalwarp \"{self.path}\" -s_srs {self.profile['crs']} -t_srs {t_srs} \"{new_path}\"",
             shell=True)
         process.wait()
+        # rasterio version
         # with rasterio.open(self.path) as src:
         #     transform, width, height = calculate_default_transform(src.crs, t_srs, src.width, src.height, *src.bounds)
         #     kwargs = src.meta.copy()

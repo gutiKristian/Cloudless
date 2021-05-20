@@ -67,7 +67,7 @@ class GranuleCalculator:
             # saving connected with worker
             if path is None:
                 path = "/".join(granule.paths_to_raster[:-1].split(os.path.sep)) + "/" + name
-            x_res, y_res = granule.get_image_resolution()
+            x_res, y_res = s2_get_resolution(granule.spatial_resolution)
         else:
             x_res, y_res = raster_img.shape[0], raster_img.shape[1]
 
@@ -112,7 +112,7 @@ class GranuleCalculator:
         dataset.FlushCache()
         # Update worker if everything has been done correctly and worker is available
         if granule is not None:
-            granule.update_worker(name, path)
+            granule.update_granule(name, path)
         del dataset, driver
         return path  # path where it is saved
 
