@@ -1,9 +1,13 @@
 import os
+
+import numpy as np
 import pytest
 from Pipeline.utils import *
 from Pipeline.Worker import S2Worker
 from Pipeline.Granule import S2Granule
 from Pipeline.Band import Band
+from Pipeline.Mask import S2JIT
+from Pipeline.Detectors import S2Detectors
 import pathlib
 
 
@@ -42,6 +46,7 @@ class TestPipeline:
     """
     GRANULE
     """
+
     def test_no_path(self):
         with pytest.raises(FileNotFoundError):
             S2Granule("test", 10, ["B02"])
@@ -81,6 +86,68 @@ class TestPipeline:
     """
     BANDS
     """
+
     def test_band_dataset_manipulation(self):
         TestPipeline.granule["B03"].load_raster()
         assert type(TestPipeline.granule["B03"].raster()) == numpy.ndarray
+
+    """
+    JIT-ed computations
+    """
+
+    def test_median_computation_anomaly(self):
+        data = np.ones(shape=(3, 10, 10))
+        data[0] = data[0] * 5
+        data[2] = data[2] * 9
+        median = np.median(data, axis=0)
+        median[0, 0] = 0  # no data anomaly
+        result = S2JIT.s2_median_analysis(data, median)
+        expected = np.median(data, axis=0)
+        assert np.array_equal(result, expected)
+
+    def test_median_computation_no_anomaly(self):
+        #  Without no data values
+        data = np.ones(shape=(3, 10, 10))
+        data[0] = data[0] * 10
+        data[2] = data[2] * 18
+        median = np.median(data, axis=0)
+        result = S2JIT.s2_median_analysis(data, median)
+        expected = np.median(data, axis=0)
+        assert np.array_equal(result, expected)
+
+    def test_ndvi_pixel_analysis(self):
+        #  CURRENT NDVI SETUPS
+        ndvi = [np.ones(shape=(10, 10)), np.ones(shape=(10, 10))]
+        ndvi[0] = ndvi[0] * (-1)
+        ndvi_current_max = np.ones(shape=(10, 10)) * (-10)
+        #  CURRENT DATA SETUP
+        data = [np.ones(shape=(3, 10, 10)), np.ones(shape=(3, 10, 10)) * 10]
+        #  DOY SETUPS
+        doy = np.zeros(shape=(10, 10))
+        doys = np.array([1, 2])
+        expected_doy = np.ones(shape=(10, 10)) * 2
+        # Preallocated result data
+        result_data = np.zeros(shape=(3, 10, 10))
+
+        S2JIT.s2_ndvi_pixel_analysis(ndvi, ndvi_current_max, data, doys, result_data, doy, 10, 10)
+        assert np.array_equal(result_data, data[1])  # TEST IF FINAL DATA HAS BEEN CHANGED, SAME FOR DOY
+        assert np.array_equal(doy, expected_doy)
+        assert np.array_equal(ndvi_current_max, ndvi[1])  # TEST IF THE CURRENT MAX NDVI HAS BEEN CHANGED AS WELL
+
+    """
+    DETECTORS
+    """
+
+    def test_scl_detector(self):
+        """
+        Test if we if the function filters out correct number of pixels.
+        """
+        #  Make a copy
+        c = TestPipeline.granule["SCL"].raster()
+        #  All no data
+        TestPipeline.granule.bands[60]["SCL"].raster_image = c * 0
+        expected_sum = 3348900
+        assert expected_sum == S2Detectors.scl(TestPipeline.granule).sum()
+        #  No cloud test
+        TestPipeline.granule.bands[60]["SCL"].raster_image = c * 0 + 3
+        assert 0 == S2Detectors.scl(TestPipeline.granule).sum()
