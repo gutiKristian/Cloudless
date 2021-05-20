@@ -1,6 +1,7 @@
 import json
 import os
 import re
+from sys import platform
 from typing import *
 import shutil
 import subprocess
@@ -29,7 +30,7 @@ class Downloader:
     raster_url = "https://dhr1.cesnet.cz/odata/v1/Products('{}')/Nodes('{}.SAFE')/Nodes('GRANULE')/" \
                  "Nodes('{}')/Nodes('IMG_DATA')/Nodes('R{}')/Nodes('{}.jp2')/$value"
     raster_url_l1c = "https://dhr1.cesnet.cz/odata/v1/Products('{}')/Nodes('{}.SAFE')/Nodes('GRANULE')/" \
-                 "Nodes('{}')/Nodes('IMG_DATA')/Nodes('{}.jp2')/$value"
+                     "Nodes('{}')/Nodes('IMG_DATA')/Nodes('{}.jp2')/$value"
 
     def __init__(self, user_name: str, password: str, root_path: str = None, polygon: List = None,
                  date: datetime = (datetime.datetime.now() - datetime.timedelta(days=14), datetime.datetime.now()),
@@ -102,8 +103,9 @@ class Downloader:
                 manifest = self.download_meta_data(Downloader.manifest_url.format(entry["id"], entry["title"]),
                                                    data_set_path + "manifest.safe")
                 manifest_imgs = Downloader.parse_manifest(manifest)
-                meta_data = self.download_meta_data(Downloader.meta_url.format(entry["id"], entry["title"], "MTD_MSIL1C.xml"),
-                                                    data_set_path + "MTD_MSIL1C.xml")
+                meta_data = self.download_meta_data(
+                    Downloader.meta_url.format(entry["id"], entry["title"], "MTD_MSIL1C.xml"),
+                    data_set_path + "MTD_MSIL1C.xml")
                 raster_urls = Downloader.get_raster_urls_l1c(meta_data, entry, bands)
                 futures = []
                 with ThreadPoolExecutor(max_workers=10) as executor:
@@ -152,12 +154,14 @@ class Downloader:
     def get_raster_urls_l1c(meta, entry, bands):
         bands = set(bands)
         raster_urls = []
-        pattern = re.compile(r'<IMAGE_FILE>GRANULE/(L1C_[0-9A-Z_]+)/IMG_DATA/(([0-9A-Z_]+)_([0-9A-Z_]{03}))</IMAGE_FILE>')
+        pattern = re.compile(
+            r'<IMAGE_FILE>GRANULE/(L1C_[0-9A-Z_]+)/IMG_DATA/(([0-9A-Z_]+)_([0-9A-Z_]{03}))</IMAGE_FILE>')
         for m in re.finditer(pattern, meta):
             if not len(bands.intersection({m.group(4)})) > 0:
                 continue
             bands = bands - {m.group(4)}
-            raster_urls.append((Downloader.raster_url_l1c.format(entry["id"], entry["title"], m.group(1), m.group(2)), m.group(2)))
+            raster_urls.append(
+                (Downloader.raster_url_l1c.format(entry["id"], entry["title"], m.group(1), m.group(2)), m.group(2)))
         return raster_urls
 
     def get_raster_urls(self, meta, entry, spatial_res, bands):
@@ -257,8 +261,9 @@ class Downloader:
                 manifest = self.download_meta_data(Downloader.manifest_url.format(entry["id"], entry["title"]),
                                                    data_set_path + "manifest.safe")
                 manifest_imgs = Downloader.parse_manifest(manifest)
-                meta_data = self.download_meta_data(Downloader.meta_url.format(entry["id"], entry["title"], "MTD_MSIL2A.xml"),
-                                                    data_set_path + "MTD_MSIL2A.xml")
+                meta_data = self.download_meta_data(
+                    Downloader.meta_url.format(entry["id"], entry["title"], "MTD_MSIL2A.xml"),
+                    data_set_path + "MTD_MSIL2A.xml")
                 raster_urls = self.get_raster_urls(meta_data, entry, primary_spatial_res, bands)
                 futures = []
                 with ThreadPoolExecutor(max_workers=10) as executor:
@@ -361,8 +366,8 @@ class Downloader:
                 log.info("Found regex for the tile!")
             log.info("Area defined with regex in text search")
         log.info("Downloader has enough information, performing initial request")
-        #  A bit clumsy but it's made to speed up the response when user is creating job, it's just a confirmation
-        # that the job is valid and we've got dataset s to work with
+        #  A bit clumsy but it's made to speed up the response of the sever when user is creating job,
+        #  it's just a confirmation that the job is valid and we've got datasets to work with
         self.__obj_cache['urls'] = self.__build_info_queries()
         overall_datasets = 0
         for url in self.__obj_cache['urls']:
@@ -410,8 +415,14 @@ class Downloader:
 
     @staticmethod
     def calculate_md5(path: str):
-        process = subprocess.Popen(f"md5sum {path}", shell=True,
-                                   stdout=subprocess.PIPE)
+        process = None
+        if platform == "win32":
+            # process = subprocess.Popen(f"CertUtil -hashfile {path} MD5", shell=True,
+            #                            stdout=subprocess.PIPE)
+            return None
+        else:
+            process = subprocess.Popen(f"md5sum {path}", shell=True,
+                                       stdout=subprocess.PIPE)
         out = process.communicate()
         if len(out) < 1:
             return None
