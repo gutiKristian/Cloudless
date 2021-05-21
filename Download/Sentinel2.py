@@ -366,7 +366,7 @@ class Downloader:
                 log.info("Found regex for the tile!")
             log.info("Area defined with regex in text search")
         log.info("Downloader has enough information, performing initial request")
-        #  A bit clumsy but it's made to speed up the response of the sever when user is creating job,
+        #  A bit clumsy but it's made to speed up the response of the server when user is creating job,
         #  it's just a confirmation that the job is valid and we've got datasets to work with
         self.__obj_cache['urls'] = self.__build_info_queries()
         overall_datasets = 0
@@ -383,11 +383,17 @@ class Downloader:
 
     def __parse_cached_response(self):
         """
+        Method parses responses for initial queries and sort them based on the mercator id (position)
+        and after we download these data "mercator by mercator".
         Response for Polygon is unstructured and messy for us, since we download the datasets by tiles
         and therefore we are able to run pipeline meanwhile another granule(tile) dataset is downloading.
         """
-        entries = list(self.__obj_cache['requests'].values())[0]['entry']
         #  If there is only one result the request contains only dict to follow the pattern we will wrap it with list
+        urls = list(self.__obj_cache['requests'].values())
+        entries = []
+        for url in urls:
+            entries += url['entry']
+
         if type(entries) == dict:
             entries = [entries]
         for entry in entries:
