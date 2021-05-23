@@ -19,7 +19,7 @@ class Task(ABC):
 
     @staticmethod
     @abstractmethod
-    def perform_computation(*args) -> S2Granule:
+    def perform_computation(worker: S2Worker, *args) -> S2Granule:
         raise NotImplemented
 
 
@@ -128,7 +128,7 @@ class S2CloudlessPerPixel(Task):
 class MedianPerPixel(Task):
 
     @staticmethod
-    def perform_computation(worker: S2Worker) -> S2Granule:
+    def perform_computation(worker: S2Worker, args=None) -> S2Granule:
         """
         This method takes the median of all the pixels.
         """
