@@ -75,7 +75,7 @@ class S2Detectors:
         mercator = extract_mercator(g.path)
         # get credentials from file
         try:
-            downloader = Downloader("kristianson12", "mosvegcz", root_path=working_path,
+            downloader = Downloader("example", "thesis", root_path=working_path,
                                     date=(g.data_take, g.data_take),
                                     product_type="S2MSI1C", mercator_tiles=[mercator])
         except IncorrectInput:

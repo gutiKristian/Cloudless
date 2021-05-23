@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import sys
 from sys import platform
 from typing import *
 import shutil
@@ -207,7 +208,7 @@ class Downloader:
         return Downloader.calculate_md5(path) == check_sum
 
     # downloading is triggered by the user, each time he calls this method
-    def download_tile_whole(self, unzip: bool = True):
+    def download_granule_full(self, unzip: bool = True):
         """
         Downloads entire granule dataset, all meta data and spatial resolution images.
         File will be structured in .SAFE format. Yields path to the downloaded content.
@@ -240,7 +241,7 @@ class Downloader:
 
         log.info("Everything downloaded")
 
-    def download_tile_bands(self, primary_spatial_res: str, bands: List[str] = None):
+    def download_granule_bands(self, primary_spatial_res: str, bands: List[str] = None):
         """
         @param primary_spatial_res: 20 -> 20m, 10 -> 10m, 60 -> 60m
         @param bands: ["B01", ... ]
@@ -283,18 +284,25 @@ class Downloader:
         log.info("All downloaded")
 
     # all_... methods download everything at once
-    def download_all_whole(self, unzip: bool = False) -> List[str]:
+    def download_full_all(self, unzip: bool = False) -> List[str]:
         """
+        Downloads whole dataset and every requested tile.
         Returns list of paths to the downloaded content.
         """
         paths = []
-        for e in self.download_tile_whole(unzip=unzip):
+        for e in self.download_granule_full(unzip=unzip):
             paths.append(e)
         return paths
 
-    def download_all_bands(self, primary_spatial_res: str, bands: List[str] = None):
+    def download_bands_all(self, primary_spatial_res: str, bands: List[str] = None):
+        """
+        Downloads every granule and in each granule required band.
+        @param primary_spatial_res: spatial
+        @param bands: required bands
+        @return: paths to the files
+        """
         paths = []
-        for e in self.download_tile_bands(primary_spatial_res, bands):
+        for e in self.download_granule_bands(primary_spatial_res, bands):
             paths.append(e)
         return paths
 
@@ -304,6 +312,11 @@ class Downloader:
         """
         index and res attributes are there for backward compatibility idk why are the manifests different
         """
+
+        # calculating checksum on windows not yet supported
+        if sys.platform == "win32":
+            return None
+
         for img in manifest_imgs:
             try:
                 index = 1
