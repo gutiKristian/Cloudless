@@ -36,6 +36,7 @@ class S2Detectors:
     @staticmethod
     def max_ndvi(g: S2Granule) -> np.ndarray:
         """
+        Experimental...shows how easy it is to add new detectors.
         Detector based on the vegetation index in the area.
         For each tile veg. index is computed and normalized from <-1,1> to <0,3>.
         Based on this the area where the sum of the ndvi is biggest is chosen.

@@ -214,7 +214,7 @@ class GranuleCalculator:
         log.debug(f"Worker {granule.doy}, cloud index mask.")
         #  Compute cloud mask for each tile
         arr = detector(granule)  # (slices, res_x, res_y)
-        #  Each index represents one tile and her cloud percentage
+        #  Each index represents one tile and cloud percentage
         # result = np.zeros(shape=granule.slice_index ** 2)
         shp1 = arr.shape[1]
         shp2 = arr.shape[2]
