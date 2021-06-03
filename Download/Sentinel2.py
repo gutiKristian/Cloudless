@@ -355,6 +355,7 @@ class Downloader:
                             "AND beginposition:{}".format(self.platform_name, self.product_type,
                                                           self.__obj_cache['cloud'], self.__obj_cache['time'])
         suffix = "&rows=100&format=json"
+        # TODO: In here we should check for more than > 100 and build queries for them as well
         if self.polygon:
             self.__obj_cache['polygon'] = True
             return [result + ' AND footprint:"Intersects(Polygon(({})))")'.format(
