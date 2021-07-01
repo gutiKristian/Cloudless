@@ -73,6 +73,11 @@ def extract_mercator(path: str) -> str:
 
 
 def s2_get_resolution(spatial):
+    """
+    Return image size for that spatial res.
+    @param spatial:
+    @return:
+    """
     if spatial == 10:
         return 10980, 10980
     if spatial == 20:
@@ -139,7 +144,7 @@ def find_closest_slice(index: int):
 def ndvi(red: numpy.ndarray, nir: numpy.ndarray) -> numpy.ndarray:
     ndvi1 = (nir - red)
     ndvi2 = (nir + red)
-    return numpy.divide(ndvi1, ndvi2, out=numpy.zeros_like(ndvi1), where=ndvi2 != 0).squeeze()
+    return numpy.divide(ndvi1, ndvi2, out=numpy.zeros_like(ndvi1).astype(float), where=ndvi2 != 0).squeeze()
 
 
 def slice_raster(index: int, image: numpy.ndarray) -> numpy.ndarray:

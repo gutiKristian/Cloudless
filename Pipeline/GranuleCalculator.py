@@ -67,7 +67,7 @@ class GranuleCalculator:
             # saving connected with worker
             if path is None:
                 path = "/".join(granule.paths_to_raster[:-1].split(os.path.sep)) + "/" + name
-            x_res, y_res = granule.get_image_resolution()
+            x_res, y_res = s2_get_resolution(granule.spatial_resolution)
         else:
             x_res, y_res = raster_img.shape[0], raster_img.shape[1]
 
@@ -112,7 +112,7 @@ class GranuleCalculator:
         dataset.FlushCache()
         # Update worker if everything has been done correctly and worker is available
         if granule is not None:
-            granule.update_worker(name, path)
+            granule.update_granule(name, path)
         del dataset, driver
         return path  # path where it is saved
 
@@ -214,7 +214,7 @@ class GranuleCalculator:
         log.debug(f"Worker {granule.doy}, cloud index mask.")
         #  Compute cloud mask for each tile
         arr = detector(granule)  # (slices, res_x, res_y)
-        #  Each index represents one tile and her cloud percentage
+        #  Each index represents one tile and cloud percentage
         # result = np.zeros(shape=granule.slice_index ** 2)
         shp1 = arr.shape[1]
         shp2 = arr.shape[2]

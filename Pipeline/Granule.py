@@ -13,7 +13,7 @@ gdal.UseExceptions()
 class S2Granule:
 
     def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1,
-                t_srs: str = 'EPSG:32633',  granule_type: str = "L2A"):
+                 t_srs: str = 'EPSG:32633', granule_type: str = "L2A"):
         if not is_dir_valid(path):
             raise FileNotFoundError("Dataset has not been found !")
         if not supported_granule_type(granule_type):
@@ -23,11 +23,12 @@ class S2Granule:
         self.spatial_resolution = spatial_res
         self.desired_bands = desired_bands
         self.t_srs = t_srs
-        self.meta_data_path = self.path + os.path.sep + ("MTD_MSIL2A.xml" if granule_type == "L2A" else "MTD_MSIL1C.xml")
+        self.meta_data_path = self.path + os.path.sep + (
+            "MTD_MSIL2A.xml" if granule_type == "L2A" else "MTD_MSIL1C.xml")
         self.meta_data_gdal = None
         self.meta_data = None
         self.data_take = None
-        self.doy = None
+        self.doy = 0
         self.paths_to_raster = None
         self.__initialize_meta()
         self.__find_images()
@@ -78,7 +79,8 @@ class S2Granule:
 
     def __to_band_dictionary(self) -> dict:
         """
-        Match list of paths of bands to dictionary for better access.
+        Match list of paths of bands with desired bands to dictionary of bands.
+        @return: dictionary of Band class elements
         """
         if not self.paths_to_raster or len(self.paths_to_raster) == 0:
             log.error(f"Raster images not present in {self.path}")
@@ -94,16 +96,22 @@ class S2Granule:
             key = key[-1]
             if key in self.desired_bands:
                 b = Band(band, slice_index=self.slice_index)
+                #  Automatically resample band to working spatial resolution
                 if b.profile["width"] != s2_get_resolution(self.spatial_resolution)[0]:
                     b.resample(s2_get_resolution(self.spatial_resolution)[0] / b.profile["width"], delete=True)
                 e_dict[self.spatial_resolution][key] = b
         for band in self.desired_bands:
             if band not in e_dict[self.spatial_resolution]:
-                raise Exception(f"Band {band} is missing in the dataset")
+                raise Exception(f"Band {band} is missing in the dataset, terminating")
         log.info("All necessary bands are present...Continue")
         return e_dict
 
     def __initialize_meta(self) -> None:
+        """
+        If the metadata file is present we extract the DATATAKE to find out the DOY for this dataset.
+        If there's no metadata file the DOY isn't acquired and by default is set to 0, what means no-data.
+        @return: None
+        """
         try:
             self.meta_data_gdal = gdal.Open(self.meta_data_path)
             self.meta_data = self.meta_data_gdal.GetMetadata()
@@ -128,13 +136,6 @@ class S2Granule:
             return paths[7:20]
         return paths[20::]
 
-    def get_image_resolution(self) -> Tuple[int, int]:
-        if self.spatial_resolution == 10:
-            return 10980, 10980
-        elif self.spatial_resolution == 20:
-            return 5490, 5490
-        return 1830, 1830
-
     def add_another_band(self, path_to_band: str, key: str) -> None:
         """
         :param path_to_band - path to the raster data
@@ -158,14 +159,14 @@ class S2Granule:
 
     def free_resources(self) -> None:
         """
-        Release the bands numpy arrays! With the TEMPS
+        Release the bands numpy arrays! With the TEMPS.
         :return: None
         """
         for band in self.bands[self.spatial_resolution].values():
             band.free_resources()
         self.temp = {}
 
-    def update_worker(self, name: str, path: str) -> None:
+    def update_granule(self, name: str, path: str) -> None:
         """
         Register new file in worker.
         :param name: represents the file in the worker class
@@ -205,12 +206,12 @@ class S2Granule:
         """
         The band that will be returned is band with the active
         spatial resolution
-        :param item: band for instance 'B01' or 'TCI'
+        :param item: band for instance 'B01' or 'B8A'
         :return: instance of a Band class
         """
         return self.bands[self.spatial_resolution][item]
 
     def __str__(self):
         return f"Granule: {os.path.basename(os.path.normpath(self.path))}\n" \
-               f"Bands: {self.desired_bands}\nDoy: {self.doy}" \
+               f"Bands: {self.desired_bands}\n Doy: {self.doy}" \
                f"Granule type: {self.granule_type}"

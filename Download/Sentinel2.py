@@ -1,6 +1,8 @@
 import json
 import os
 import re
+import sys
+from sys import platform
 from typing import *
 import shutil
 import subprocess
@@ -29,7 +31,7 @@ class Downloader:
     raster_url = "https://dhr1.cesnet.cz/odata/v1/Products('{}')/Nodes('{}.SAFE')/Nodes('GRANULE')/" \
                  "Nodes('{}')/Nodes('IMG_DATA')/Nodes('R{}')/Nodes('{}.jp2')/$value"
     raster_url_l1c = "https://dhr1.cesnet.cz/odata/v1/Products('{}')/Nodes('{}.SAFE')/Nodes('GRANULE')/" \
-                 "Nodes('{}')/Nodes('IMG_DATA')/Nodes('{}.jp2')/$value"
+                     "Nodes('{}')/Nodes('IMG_DATA')/Nodes('{}.jp2')/$value"
 
     def __init__(self, user_name: str, password: str, root_path: str = None, polygon: List = None,
                  date: datetime = (datetime.datetime.now() - datetime.timedelta(days=14), datetime.datetime.now()),
@@ -102,8 +104,9 @@ class Downloader:
                 manifest = self.download_meta_data(Downloader.manifest_url.format(entry["id"], entry["title"]),
                                                    data_set_path + "manifest.safe")
                 manifest_imgs = Downloader.parse_manifest(manifest)
-                meta_data = self.download_meta_data(Downloader.meta_url.format(entry["id"], entry["title"], "MTD_MSIL1C.xml"),
-                                                    data_set_path + "MTD_MSIL1C.xml")
+                meta_data = self.download_meta_data(
+                    Downloader.meta_url.format(entry["id"], entry["title"], "MTD_MSIL1C.xml"),
+                    data_set_path + "MTD_MSIL1C.xml")
                 raster_urls = Downloader.get_raster_urls_l1c(meta_data, entry, bands)
                 futures = []
                 with ThreadPoolExecutor(max_workers=10) as executor:
@@ -152,12 +155,14 @@ class Downloader:
     def get_raster_urls_l1c(meta, entry, bands):
         bands = set(bands)
         raster_urls = []
-        pattern = re.compile(r'<IMAGE_FILE>GRANULE/(L1C_[0-9A-Z_]+)/IMG_DATA/(([0-9A-Z_]+)_([0-9A-Z_]{03}))</IMAGE_FILE>')
+        pattern = re.compile(
+            r'<IMAGE_FILE>GRANULE/(L1C_[0-9A-Z_]+)/IMG_DATA/(([0-9A-Z_]+)_([0-9A-Z_]{03}))</IMAGE_FILE>')
         for m in re.finditer(pattern, meta):
             if not len(bands.intersection({m.group(4)})) > 0:
                 continue
             bands = bands - {m.group(4)}
-            raster_urls.append((Downloader.raster_url_l1c.format(entry["id"], entry["title"], m.group(1), m.group(2)), m.group(2)))
+            raster_urls.append(
+                (Downloader.raster_url_l1c.format(entry["id"], entry["title"], m.group(1), m.group(2)), m.group(2)))
         return raster_urls
 
     def get_raster_urls(self, meta, entry, spatial_res, bands):
@@ -203,7 +208,7 @@ class Downloader:
         return Downloader.calculate_md5(path) == check_sum
 
     # downloading is triggered by the user, each time he calls this method
-    def download_tile_whole(self, unzip: bool = True):
+    def download_granule_full(self, unzip: bool = True):
         """
         Downloads entire granule dataset, all meta data and spatial resolution images.
         File will be structured in .SAFE format. Yields path to the downloaded content.
@@ -236,7 +241,7 @@ class Downloader:
 
         log.info("Everything downloaded")
 
-    def download_tile_bands(self, primary_spatial_res: str, bands: List[str] = None):
+    def download_granule_bands(self, primary_spatial_res: str, bands: List[str] = None):
         """
         @param primary_spatial_res: 20 -> 20m, 10 -> 10m, 60 -> 60m
         @param bands: ["B01", ... ]
@@ -257,8 +262,9 @@ class Downloader:
                 manifest = self.download_meta_data(Downloader.manifest_url.format(entry["id"], entry["title"]),
                                                    data_set_path + "manifest.safe")
                 manifest_imgs = Downloader.parse_manifest(manifest)
-                meta_data = self.download_meta_data(Downloader.meta_url.format(entry["id"], entry["title"], "MTD_MSIL2A.xml"),
-                                                    data_set_path + "MTD_MSIL2A.xml")
+                meta_data = self.download_meta_data(
+                    Downloader.meta_url.format(entry["id"], entry["title"], "MTD_MSIL2A.xml"),
+                    data_set_path + "MTD_MSIL2A.xml")
                 raster_urls = self.get_raster_urls(meta_data, entry, primary_spatial_res, bands)
                 futures = []
                 with ThreadPoolExecutor(max_workers=10) as executor:
@@ -278,18 +284,25 @@ class Downloader:
         log.info("All downloaded")
 
     # all_... methods download everything at once
-    def download_all_whole(self, unzip: bool = False) -> List[str]:
+    def download_full_all(self, unzip: bool = False) -> List[str]:
         """
+        Downloads whole dataset and every requested tile.
         Returns list of paths to the downloaded content.
         """
         paths = []
-        for e in self.download_tile_whole(unzip=unzip):
+        for e in self.download_granule_full(unzip=unzip):
             paths.append(e)
         return paths
 
-    def download_all_bands(self, primary_spatial_res: str, bands: List[str] = None):
+    def download_bands_all(self, primary_spatial_res: str, bands: List[str] = None):
+        """
+        Downloads every granule and in each granule required band.
+        @param primary_spatial_res: spatial
+        @param bands: required bands
+        @return: paths to the files
+        """
         paths = []
-        for e in self.download_tile_bands(primary_spatial_res, bands):
+        for e in self.download_granule_bands(primary_spatial_res, bands):
             paths.append(e)
         return paths
 
@@ -299,6 +312,11 @@ class Downloader:
         """
         index and res attributes are there for backward compatibility idk why are the manifests different
         """
+
+        # calculating checksum on windows not yet supported
+        if sys.platform == "win32":
+            return None
+
         for img in manifest_imgs:
             try:
                 index = 1
@@ -337,6 +355,7 @@ class Downloader:
                             "AND beginposition:{}".format(self.platform_name, self.product_type,
                                                           self.__obj_cache['cloud'], self.__obj_cache['time'])
         suffix = "&rows=100&format=json"
+        # TODO: In here we should check for more than > 100 and build queries for them as well
         if self.polygon:
             self.__obj_cache['polygon'] = True
             return [result + ' AND footprint:"Intersects(Polygon(({})))")'.format(
@@ -361,8 +380,8 @@ class Downloader:
                 log.info("Found regex for the tile!")
             log.info("Area defined with regex in text search")
         log.info("Downloader has enough information, performing initial request")
-        #  A bit clumsy but it's made to speed up the response when user is creating job, it's just a confirmation
-        # that the job is valid and we've got dataset s to work with
+        #  A bit clumsy but it's made to speed up the response of the server when user is creating job,
+        #  it's just a confirmation that the job is valid and we've got datasets to work with
         self.__obj_cache['urls'] = self.__build_info_queries()
         overall_datasets = 0
         for url in self.__obj_cache['urls']:
@@ -378,11 +397,17 @@ class Downloader:
 
     def __parse_cached_response(self):
         """
+        Method parses responses for initial queries and sort them based on the mercator id (position)
+        and after we download these data "mercator by mercator".
         Response for Polygon is unstructured and messy for us, since we download the datasets by tiles
         and therefore we are able to run pipeline meanwhile another granule(tile) dataset is downloading.
         """
-        entries = list(self.__obj_cache['requests'].values())[0]['entry']
         #  If there is only one result the request contains only dict to follow the pattern we will wrap it with list
+        urls = list(self.__obj_cache['requests'].values())
+        entries = []
+        for url in urls:
+            entries += url['entry']
+
         if type(entries) == dict:
             entries = [entries]
         for entry in entries:
@@ -410,8 +435,14 @@ class Downloader:
 
     @staticmethod
     def calculate_md5(path: str):
-        process = subprocess.Popen(f"md5sum {path}", shell=True,
-                                   stdout=subprocess.PIPE)
+        process = None
+        if platform == "win32":
+            # process = subprocess.Popen(f"CertUtil -hashfile {path} MD5", shell=True,
+            #                            stdout=subprocess.PIPE)
+            return None
+        else:
+            process = subprocess.Popen(f"md5sum {path}", shell=True,
+                                       stdout=subprocess.PIPE)
         out = process.communicate()
         if len(out) < 1:
             return None

@@ -60,23 +60,27 @@ class S2Worker:
 
     def _validate_files_by_mercator(self) -> None:
         if len(self.datasets) < 2:
-            raise Exception("Not enough files to execute, exactly: {}".format(len(self.datasets)))
+            log.warning("Not enough files to execute cloudless jobs")
         if self.mercator == "":
             self.mercator = extract_mercator(self.datasets[0])
         for file in self.datasets:
             if extract_mercator(file) != self.mercator:
                 raise Exception("Tiles with different area detected")
 
-    # TODO: CHANGE TO "PUBLIC" after refactor
     def _save_result(self) -> None:
+        """
+        Save the results inside result dict to raster files.
+        @return: None
+        """
         try:
             os.mkdir(self.save_result_path)
         except FileExistsError:
+            log.warning("Result directory already exists. File will be deleted.")
             shutil.rmtree(self.save_result_path)
             os.mkdir(self.save_result_path)
-            log.warning("Result directory already exists. File will be deleted.")
         # projection = list(self.granules[-1].bands[self.spatial_resolution].values())[0].projection
         # geo_transform = list(self.granules[-1].bands[self.spatial_resolution].values())[0].geo_transform
+        # Fetch random profile from the bands
         profile = list(self.granules[-1].bands[self.spatial_resolution].values())[0].profile
         log.debug(f"Profile: {profile}")
         log.debug(f"Loaded from  {list(self.granules[-1].bands[self.spatial_resolution].values())[0].path}")
@@ -86,17 +90,13 @@ class S2Worker:
                 executor.submit(GranuleCalculator.save_band_rast, self.result[key], path=path, prof=profile,
                                 driver="GTiff",
                                 dtype=rastTypes.uint16)
-                # GranuleCalculator.save_band_rast(self.result[key], path=path, prof=profile, driver="GTiff",
-                #                              dtype=rastTypes.uint16)
-            # GranuleCalculator.save_band(raster_img=self.result[key], name=key + "_" + str(self.spatial_resolution),
-            #                             path=path, projection=projection, geo_transform=geo_transform)
 
     def _load_bands(self, desired_bands: List[str] = None):
         """
         Load each band in each granule.
         """
-        for worker in self.granules:
-            worker.load_bands(desired_bands)
+        for granule in self.granules:
+            granule.load_bands(desired_bands)
 
     def release_bands(self):
         """

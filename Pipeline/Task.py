@@ -19,7 +19,7 @@ class Task(ABC):
 
     @staticmethod
     @abstractmethod
-    def perform_computation(*args) -> S2Granule:
+    def perform_computation(worker: S2Worker, *args) -> S2Granule:
         raise NotImplemented
 
 
@@ -128,7 +128,7 @@ class S2CloudlessPerPixel(Task):
 class MedianPerPixel(Task):
 
     @staticmethod
-    def perform_computation(worker: S2Worker) -> S2Granule:
+    def perform_computation(worker: S2Worker, args=None) -> S2Granule:
         """
         This method takes the median of all the pixels.
         """
@@ -167,7 +167,7 @@ class MedianPerPixel(Task):
 class PerTile(Task):
 
     @staticmethod
-    def perform_computation(worker: S2Worker, detector=S2Detectors.scl) -> S2Granule:
+    def perform_computation(worker: S2Worker, detector: S2Detectors = S2Detectors.scl) -> S2Granule:
         log.info(f"Running per-tile masking. Dataset {worker.main_dataset_path}")
         # Gather information
         res_x, res_y = s2_get_resolution(worker.spatial_resolution)
