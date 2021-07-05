@@ -47,6 +47,7 @@ class Band:
             else:
                 # Expects iterable and Polygon ain't iterable therefore [pol]
                 self.raster_image, _ = mask(dataset, [self.polygon], crop=True)
+                self.raster_image = self.raster_image.squeeze()
         self._was_raster_read = True
         if self.slice_index > 1:
             self.raster_image = slice_raster(self.slice_index, self.raster_image)

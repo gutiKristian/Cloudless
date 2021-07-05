@@ -120,8 +120,9 @@ class S2Worker:
         if self.polygon is None:
             return s2_get_resolution(self.spatial_resolution)
         granule = self.granules[-1]
-        band = granule.bands[self.spatial_resolution].values()[-1]
-        return band.load_raster().shape
+        band = list(granule.bands[self.spatial_resolution].values())[-1]
+        band.load_raster()
+        return band.raster_image.shape
 
     def __str__(self):
         return f"Dataset: {self.main_dataset_path}\n" \
