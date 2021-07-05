@@ -46,7 +46,7 @@ class Band:
                 self.raster_image = dataset.read(1)
             else:
                 # Expects iterable and Polygon ain't iterable therefore [pol]
-                self.raster_image = mask(dataset, [self.polygon], crop=True)
+                self.raster_image, _ = mask(dataset, [self.polygon], crop=True)
         self._was_raster_read = True
         if self.slice_index > 1:
             self.raster_image = slice_raster(self.slice_index, self.raster_image)
