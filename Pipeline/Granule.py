@@ -43,6 +43,8 @@ class S2Granule:
         self.temp = {}
         self.proj = self.get_projection()
         self.__trasnform_polygon()
+        for band in self.bands:
+            band.polygon = self.polygon
         log.info(f"Initialized granule:\n{self}")
 
     def __trasnform_polygon(self, input_epsg: str = "EPSG:4326") -> None:

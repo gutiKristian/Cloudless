@@ -14,7 +14,7 @@ gdal.UseExceptions()
 
 
 class Band:
-    def __init__(self, path: str, load_on_init: bool = False, slice_index: int = 1, polygon: Optional[Polygon] = None):
+    def __init__(self, path: str, load_on_init: bool = False, slice_index: int = 1):
         if not is_file_valid(path):
             raise FileNotFoundError("Raster does not exist!")
         if slice_index > 1:
@@ -32,7 +32,7 @@ class Band:
         if load_on_init:
             self.load_raster()
         self.__rasterio_reference = None
-        self.polygon = polygon
+        self.polygon = None
 
     def load_raster(self) -> None:
         """
