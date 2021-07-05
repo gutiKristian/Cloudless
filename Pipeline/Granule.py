@@ -2,6 +2,8 @@ from datetime import datetime
 from xml.etree import ElementTree  # xml
 
 import numpy as np
+import pyproj
+import shapely.ops
 from osgeo import gdal
 from Pipeline.Band import *
 from Pipeline.utils import *
@@ -39,7 +41,19 @@ class S2Granule:
         self.bands = self.__to_band_dictionary()
         self.cloud_index = 0
         self.temp = {}
+        self.proj = self.get_projection()
+        self.__trasnform_polygon()
         log.info(f"Initialized granule:\n{self}")
+
+    def __trasnform_polygon(self, input_epsg: str = "EPSG:4326") -> None:
+        """
+        Method transform input polygon to coordinates used within bands.
+        Mosveg uses EPSG:4326 and therefore it is our default.
+        """
+        w = pyproj.CRS(input_epsg)
+        utm = pyproj.CRS(self.proj)
+        pr = pyproj.Transformer.from_crs(w, utm, always_xy=True).transform
+        self.polygon = shapely.ops.transform(pr, self.polygon)
 
     def __find_images(self) -> None:
         """
