@@ -85,6 +85,7 @@ class Downloader:
         self.__obj_cache = {'requests': {}, 'polygon': False}
         self.__cache = {}
         self.time_str = time_str
+        self.overall_datasets = 0  # If > 100, we must do some paging
         # Check
         self.__minimum_requirements()
 
@@ -354,17 +355,17 @@ class Downloader:
         result = self.url + "search?q=( platformname:{} AND producttype:{} AND cloudcoverpercentage:{} " \
                             "AND beginposition:{}".format(self.platform_name, self.product_type,
                                                           self.__obj_cache['cloud'], self.__obj_cache['time'])
-        suffix = "&rows=100&format=json"
+        # suffix = "&rows=100&format=json"
         # TODO: In here we should check for more than > 100 and build queries for them as well
         if self.polygon:
             self.__obj_cache['polygon'] = True
             return [result + ' AND footprint:"Intersects(Polygon(({})))")'.format(
-                ",".join("{} {}".format(p[0], p[1]) for p in list(self.polygon.exterior.coords))) + suffix]
+                ",".join("{} {}".format(p[0], p[1]) for p in list(self.polygon.exterior.coords)))]  # + suffix
         if self.mercator_tiles:
-            return [result + " AND *{}*)".format(tile) + suffix for tile in self.mercator_tiles]
+            return [result + " AND *{}*)".format(tile) for tile in self.mercator_tiles]  # + suffix
         if self.tile_uuids:
             return [self.url + "?=(uuid:{})".format(uuid) for uuid in self.tile_uuids]
-        return [result + " AND {} ".format(self.text_search) + suffix]
+        return [result + " AND {} ".format(self.text_search)]  # + suffix
 
     def __minimum_requirements(self):
         """
@@ -382,15 +383,16 @@ class Downloader:
         log.info("Downloader has enough information, performing initial request")
         #  A bit clumsy but it's made to speed up the response of the server when user is creating job,
         #  it's just a confirmation that the job is valid and we've got datasets to work with
+        #  NEW! : URLS ARE WITHOUT &rows=100&format=json SUFFIX FOR EASIER PAGING IF NEEDED
         self.__obj_cache['urls'] = self.__build_info_queries()
-        overall_datasets = 0
         for url in self.__obj_cache['urls']:
-            if overall_datasets > 0:
+            url += "&rows=100&format=json"  # Add suffix | in post init queries add suffix based on overall_datasets
+            if self.overall_datasets > 0:
                 log.info("Required minimum of datasets achieved.")
                 return
             self.__obj_cache['requests'][url] = pandas.read_json(self.session.get(url).content)['feed']
-            overall_datasets += int(self.__obj_cache['requests'][url]['opensearch:totalResults'])
-        if overall_datasets > 0:
+            self.overall_datasets += int(self.__obj_cache['requests'][url]['opensearch:totalResults'])
+        if self.overall_datasets > 0:
             log.info("Required minimum of datasets achieved.")
             return
         raise IncorrectInput("Not enough datasets to download or run the pipeline for this input")
@@ -422,11 +424,21 @@ class Downloader:
         This method gathers the remaining data that weren't downloaded/requested during the initialization
         because of response time optimization.
         """
+        base = 0
+        suffix = "&start={}&rows=100&format=json"
         for url in self.__obj_cache['urls']:
             if self.__obj_cache['polygon']:
-                # Already have full request just parse it
-                break
+                while self.overall_datasets > 100:
+                    base += 1
+                    n_url = url
+                    n_url += suffix.format(base)
+                    self.overall_datasets -= 100
+                    self.__obj_cache['requests'][n_url] = pandas.read_json(self.session.get(n_url).content)['feed']
+                else:
+                    # Already have full request just parse it
+                    break
             if url not in self.__obj_cache['requests']:
+                url += suffix.format(100)  # not supported outside polygon definition
                 self.__obj_cache['requests'][url] = pandas.read_json(self.session.get(url).content)['feed']
             # entry for uuid is just dict
         self.__parse_cached_response()
