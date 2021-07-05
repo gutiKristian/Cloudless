@@ -26,7 +26,8 @@ class S2Worker:
         if s2_get_resolution(spatial_resolution)[0] % slice_index != 0:
             raise Exception("Unable to evenly slice the image! Please use different value, the working resolution is "
                             "{0} and slicing index is {1}")
-        if polygon is not None:
+        self.polygon = polygon
+        if self.polygon is not None:
             self.polygon = Download.Sentinel2.Downloader.create_polygon(polygon)
             if polygon is None:
                 log.warning("Invalid polygon, 100x100 tiles are going to be used")
