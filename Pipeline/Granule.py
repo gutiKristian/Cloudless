@@ -42,9 +42,10 @@ class S2Granule:
         self.cloud_index = 0
         self.temp = {}
         self.proj = self.get_projection()
-        self.__trasnform_polygon()
-        for band in self.bands[self.spatial_resolution].values():
-            band.polygon = self.polygon
+        if self.polygon is not None:
+            self.__trasnform_polygon()
+            for band in self.bands[self.spatial_resolution].values():
+                band.polygon = self.polygon
         log.info(f"Initialized granule:\n{self}")
 
     def __trasnform_polygon(self, input_epsg: str = "EPSG:4326") -> None:
