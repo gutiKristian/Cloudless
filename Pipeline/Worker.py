@@ -28,7 +28,7 @@ class S2Worker:
                             "{0} and slicing index is {1}")
         self.polygon = polygon
         if self.polygon is not None:
-            self.polygon = Download.Sentinel2.Downloader.create_polygon(polygon)
+            self.polygon = Download.Sentinel2.Downloader.create_polygon(polygon).bounds
             if polygon is None:
                 log.warning("Invalid polygon, 100x100 tiles are going to be used")
         self.output_bands = output_bands
