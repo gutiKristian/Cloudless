@@ -272,7 +272,7 @@ class Downloader:
                     for url, name in raster_urls:
                         check_sum = self.__extract_check_sum(name, manifest_imgs)
                         futures.append(executor.submit(self.download_file, url, data_set_path + name + ".jp2",
-                                                       check_sum=check_sum))
+                                                       check_sum=None))  # disabled checksum
                         # status = self.download_file(url, data_set_path + name + ".jp2", check_sum=check_sum)
                 for f in futures:
                     status = status and f.result()
@@ -452,7 +452,6 @@ class Downloader:
             #                            stdout=subprocess.PIPE)
             return None
         else:
-            return None
             process = subprocess.Popen(f"md5sum {path}", shell=True,
                                        stdout=subprocess.PIPE)
         out = process.communicate()
