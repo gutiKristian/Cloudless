@@ -452,6 +452,7 @@ class Downloader:
             #                            stdout=subprocess.PIPE)
             return None
         else:
+            return None
             process = subprocess.Popen(f"md5sum {path}", shell=True,
                                        stdout=subprocess.PIPE)
         out = process.communicate()
