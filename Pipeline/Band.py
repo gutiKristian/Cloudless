@@ -8,12 +8,13 @@ import rasterio
 from rasterio import Affine, MemoryFile
 from rasterio.warp import calculate_default_transform, reproject
 import subprocess
-
+from shapely.geometry import Polygon
+from rasterio.mask import mask
 gdal.UseExceptions()
 
 
 class Band:
-    def __init__(self, path: str, load_on_init: bool = False, slice_index: int = 1):
+    def __init__(self, path: str, load_on_init: bool = False, slice_index: int = 1, polygon: Optional[Polygon] = None):
         if not is_file_valid(path):
             raise FileNotFoundError("Raster does not exist!")
         if slice_index > 1:
@@ -31,6 +32,7 @@ class Band:
         if load_on_init:
             self.load_raster()
         self.__rasterio_reference = None
+        self.polygon = polygon
 
     def load_raster(self) -> None:
         """
@@ -40,7 +42,11 @@ class Band:
         if self._was_raster_read:
             return
         with rasterio.open(self.path) as dataset:
-            self.raster_image = dataset.read(1)
+            if self.polygon is None:
+                self.raster_image = dataset.read(1)
+            else:
+                # Expects iterable and Polygon ain't iterable therefore [pol]
+                self.raster_image = mask(dataset, [self.polygon], crop=True)
         self._was_raster_read = True
         if self.slice_index > 1:
             self.raster_image = slice_raster(self.slice_index, self.raster_image)
