@@ -53,8 +53,9 @@ class S2Worker:
                     gr = S2Granule(_path, spatial_resolution, self.output_bands, slice_index, target_projection,
                                    polygon=self.polygon)
                     self.granules.append(gr)
-            except Exception as _:
+            except Exception as e:
                 log.error(f"Did not find raster dataset in {_path}")
+                raise e
         if len(self.granules) == 0:
             raise Exception("Initialization failed")
         #  The result of masking is stored in this variable, "B01": numpy.array, etc.
