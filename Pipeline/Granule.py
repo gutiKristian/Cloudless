@@ -6,14 +6,14 @@ from osgeo import gdal
 from Pipeline.Band import *
 from Pipeline.utils import *
 from Pipeline.logger import log
-
+from shapely.geometry import Polygon
 gdal.UseExceptions()
 
 
 class S2Granule:
 
     def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1,
-                 t_srs: str = 'EPSG:32633', granule_type: str = "L2A"):
+                 t_srs: str = 'EPSG:32633', granule_type: str = "L2A", polygon: Optional[Polygon] = None):
         if not is_dir_valid(path):
             raise FileNotFoundError("Dataset has not been found !")
         if not supported_granule_type(granule_type):
@@ -23,6 +23,7 @@ class S2Granule:
         self.spatial_resolution = spatial_res
         self.desired_bands = desired_bands
         self.t_srs = t_srs
+        self.polygon = polygon
         self.meta_data_path = self.path + os.path.sep + (
             "MTD_MSIL2A.xml" if granule_type == "L2A" else "MTD_MSIL1C.xml")
         self.meta_data_gdal = None

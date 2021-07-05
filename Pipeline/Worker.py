@@ -1,5 +1,7 @@
 import shutil
 import gc
+
+import Download.Sentinel2
 from Pipeline.logger import log
 from Pipeline.GranuleCalculator import *
 from rasterio import dtypes as rastTypes
@@ -9,12 +11,13 @@ from concurrent.futures import ThreadPoolExecutor
 class S2Worker:
 
     def __init__(self, path: str, spatial_resolution: int, slice_index: int = 1, output_bands: List[str] = [],
-                 target_projection='EPSG:32633'):
+                 target_projection='EPSG:32633', polygon: List = None):
         """
         :param path: to the dataset
         :param spatial_resolution: on which we are going to operate on
         :param slice_index: per-pixel: always 1, per-tile from pre-defined choices
         :param output_bands: bands we work with
+        :param polygon: polygon that crops out our data
         """
         if not is_dir_valid(path):
             raise FileNotFoundError("{} may not exist\nPlease check if file exists".format(path))
@@ -23,6 +26,10 @@ class S2Worker:
         if s2_get_resolution(spatial_resolution)[0] % slice_index != 0:
             raise Exception("Unable to evenly slice the image! Please use different value, the working resolution is "
                             "{0} and slicing index is {1}")
+        if polygon is not None:
+            self.polygon = Download.Sentinel2.Downloader.create_polygon(polygon)
+            if polygon is None:
+                log.warning("Invalid polygon, 100x100 tiles are going to be used")
         self.output_bands = output_bands
         if len(output_bands) == 0:
             log.info(
@@ -41,7 +48,8 @@ class S2Worker:
         for _path in self.datasets:
             try:
                 if s2_is_safe_format(_path):
-                    gr = S2Granule(_path, spatial_resolution, self.output_bands, slice_index, target_projection)
+                    gr = S2Granule(_path, spatial_resolution, self.output_bands, slice_index, target_projection,
+                                   polygon=self.polygon)
                     self.granules.append(gr)
             except Exception as _:
                 log.error(f"Did not find raster dataset in {_path}")
