@@ -6,7 +6,7 @@ from Pipeline.logger import log
 from Pipeline.GranuleCalculator import *
 from rasterio import dtypes as rastTypes
 from concurrent.futures import ThreadPoolExecutor
-
+from shapely.geometry import box
 
 class S2Worker:
 
@@ -28,7 +28,8 @@ class S2Worker:
                             "{0} and slicing index is {1}")
         self.polygon = polygon
         if self.polygon is not None:
-            self.polygon = Download.Sentinel2.Downloader.create_polygon(polygon).bounds
+            b = Download.Sentinel2.Downloader.create_polygon(polygon).bounds
+            self.polygon = box(b[0], b[1], b[2], b[3])
             if polygon is None:
                 log.warning("Invalid polygon, 100x100 tiles are going to be used")
         self.output_bands = output_bands
