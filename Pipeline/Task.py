@@ -28,7 +28,7 @@ class NdviPerPixel(Task):
     @staticmethod
     def perform_computation(worker: S2Worker, constraint: int = 5) -> S2Granule:
         # log.info(f"Running optimised ndvi masking. Dataset {worker.main_dataset_path}")
-        res_x, res_y = s2_get_resolution(worker.spatial_resolution)
+        res_x, res_y = worker.get_res()
         # we don't need to stack all ndvi arrays, we need just the constraint and result
         ndvi_arrays = np.zeros(
             shape=(len(worker.granules) if len(worker.granules) < constraint else constraint, res_x, res_y),
@@ -88,7 +88,7 @@ class S2CloudlessPerPixel(Task):
         :param constraint: how many mask we allow to be opened at the same time
         :return: masked granule
         """
-        res_x, res_y = s2_get_resolution(worker.spatial_resolution)
+        res_x, res_y = worker.get_res()
         result = np.ones(shape=(len(worker.output_bands), res_x, res_y), dtype=np.uint16)
         doy = np.zeros(shape=(res_x, res_y), dtype=np.uint16)
         #  We will provide probability mask as the result as well
@@ -134,7 +134,7 @@ class MedianPerPixel(Task):
         """
         log.info(f"Running per-pixel median masking. Dataset {worker.main_dataset_path}")
         log.info(f"Picked bands: {worker.output_bands}, expected iterations: {len(worker.output_bands)}")
-        res_x, res_y = s2_get_resolution(worker.spatial_resolution)
+        res_x, res_y = worker.get_res()
         for i, band_key in enumerate(worker.output_bands, 0):
             #  Reference object for yielding size of window block, since the blocks might not be same in each iteration
             #  this is the best of possible ways to get the block
