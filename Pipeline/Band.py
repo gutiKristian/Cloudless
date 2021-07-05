@@ -68,13 +68,15 @@ class Band:
         self.load_raster()
         return self.raster_image
 
-    def band_reproject(self, t_srs='EPSG:32633', delete=True):
+    def band_reproject(self, t_srs='EPSG:32633', delete=True) -> str:
         """
         Reproject band to the given band to the other UTM zone.
         REPROJECTION SHOULD BE DONE AFTER THE PIPELINE BECAUSE REPROJECTION MIGHT CHANGE THE RESOLUTION OF RASTER.
         @param t_srs: target srs
         @param delete: delete source file after the reprojection
         """
+        if self.profile['crs'] == t_srs:
+            return self.path
         new_path, _ = os.path.splitext(self.path)
         new_path += '.tif'
         # GDAL version
@@ -106,6 +108,7 @@ class Band:
         self.path = new_path
         with rasterio.open(self.path) as dataset:
             self.profile = dataset.profile
+        return new_path
 
     def resample(self, sample_factor, delete=False):
         transform = None
