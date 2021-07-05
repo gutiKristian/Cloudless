@@ -116,6 +116,13 @@ class S2Worker:
         self.result = {}
         gc.collect()
 
+    def get_res(self) -> (int, int):
+        if self.polygon is None:
+            return s2_get_resolution(self.spatial_resolution)
+        granule = self.granules[-1]
+        band = granule.bands[self.spatial_resolution].values()[-1]
+        return band.load_raster().shape
+
     def __str__(self):
         return f"Dataset: {self.main_dataset_path}\n" \
                f"Spatial resolution: {self.spatial_resolution}\n" \
