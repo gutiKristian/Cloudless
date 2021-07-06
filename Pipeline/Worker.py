@@ -126,6 +126,11 @@ class S2Worker:
         band.load_raster()
         return band.raster_image.shape
 
+    def get_projection(self):
+        if len(self.granules) == 0:
+            return None
+        return self.granules[-1].get_projection()
+
     def __str__(self):
         return f"Dataset: {self.main_dataset_path}\n" \
                f"Spatial resolution: {self.spatial_resolution}\n" \
