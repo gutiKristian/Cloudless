@@ -206,7 +206,7 @@ class Downloader:
         if not check_sum:
             log.warning("Check sum not provided")
             return True
-        return Downloader.calculate_hash_unix(path, 'md5sum') == check_sum or Downloader.calculate_hash_unix(path, 'sha3sum') == check_sum
+        return Downloader.calculate_hash_unix(path, 'md5sum') == check_sum or Downloader.calculate_hash_unix(path, 'sha3sum -a 256') == check_sum
 
         # downloading is triggered by the user, each time he calls this method
 
@@ -438,7 +438,7 @@ class Downloader:
                     # Already have full request just parse it
                     break
             if url not in self.__obj_cache['requests']:
-                url += suffix.format(100)  # not supported outside polygon definition
+                url += suffix.format(0)  # not supported outside polygon definition
                 self.__obj_cache['requests'][url] = pandas.read_json(self.session.get(url).content)['feed']
             # entry for uuid is just dict
         self.__parse_cached_response()
