@@ -386,15 +386,13 @@ class Downloader:
         #  NEW! : URLS ARE WITHOUT &rows=100&format=json SUFFIX FOR EASIER PAGING IF NEEDED
         self.__obj_cache['urls'] = self.__build_info_queries()
         for url in self.__obj_cache['urls']:
-            url += "&rows=100&format=json"  # Add suffix | in post init queries add suffix based on overall_datasets
+            url += "&start=0&rows=100&format=json"  # Add suffix | in post init queries add suffix based on overall_datasets
+            self.__obj_cache['requests'][url] = pandas.read_json(self.session.get(url).content)['feed']
+            self.overall_datasets += int(self.__obj_cache['requests'][url]['opensearch:totalResults'])
             if self.overall_datasets > 0:
                 log.info("Required minimum of datasets achieved.")
                 return
-            self.__obj_cache['requests'][url] = pandas.read_json(self.session.get(url).content)['feed']
-            self.overall_datasets += int(self.__obj_cache['requests'][url]['opensearch:totalResults'])
-        if self.overall_datasets > 0:
-            log.info("Required minimum of datasets achieved.")
-            return
+
         raise IncorrectInput("Not enough datasets to download or run the pipeline for this input")
 
     def __parse_cached_response(self):
@@ -408,10 +406,11 @@ class Downloader:
         urls = list(self.__obj_cache['requests'].values())
         entries = []
         for url in urls:
-            entries += url['entry']
+            if type(url['entry']) == list:
+                entries += url['entry']
+            else:
+                entries.append(url['entry'])
 
-        if type(entries) == dict:
-            entries = [entries]
         for entry in entries:
             mercator = extract_mercator(entry['title'])
             if mercator not in self.__cache:
@@ -437,8 +436,8 @@ class Downloader:
                 else:
                     # Already have full request just parse it
                     break
+            url += suffix.format(0)  # not supported outside polygon definition
             if url not in self.__obj_cache['requests']:
-                url += suffix.format(0)  # not supported outside polygon definition
                 self.__obj_cache['requests'][url] = pandas.read_json(self.session.get(url).content)['feed']
             # entry for uuid is just dict
         self.__parse_cached_response()
