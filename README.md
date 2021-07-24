@@ -1,4 +1,6 @@
-# sentinel-pipeline
+# Sentinel pipeline
+
+![](https://github.com/gutiKristian/Cloudless/actions/workflows/main.yml/badge.svg?branch=dev)
 
 Sentinel pipeline allows you to create beautiful cloudless image mosaics from
 Sentinel 2 imagery. 
