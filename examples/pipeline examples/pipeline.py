@@ -5,13 +5,13 @@ import datetime
 
 from Download.Sentinel2 import Downloader
 
-# We will download tiles over Brno, we won't change the time period, default is 14 days
+# We will download tiles over Brno,
 # mercator tile 33UXQ is tile in UTM33, srs is EPSG:32633
 
 download = Downloader("example", "thesis", mercator_tiles=["33UXQ"],
                       date=(datetime.datetime(2021, 5, 8), datetime.datetime(2021, 5, 23)))
 
-# download 60m True color images - not whole dataset (around 1GB), good for slow internet
+# download 60m rasters - not whole dataset (around 1GB), good for slow internet
 paths = download.download_bands_all("60m", ["B04", "B03", "B02", "SCL", "B8A"])
 
 # where are the datasets stored

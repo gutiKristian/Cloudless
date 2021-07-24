@@ -6,7 +6,7 @@ from Pipeline.logger import log
 from Pipeline.GranuleCalculator import *
 from rasterio import dtypes as rastTypes
 from concurrent.futures import ThreadPoolExecutor
-
+from shapely.geometry import box
 
 class S2Worker:
 
@@ -28,7 +28,8 @@ class S2Worker:
                             "{0} and slicing index is {1}")
         self.polygon = polygon
         if self.polygon is not None:
-            self.polygon = Download.Sentinel2.Downloader.create_polygon(polygon).bounds
+            b = Download.Sentinel2.Downloader.create_polygon(polygon).bounds
+            self.polygon = box(b[0], b[1], b[2], b[3])
             if polygon is None:
                 log.warning("Invalid polygon, 100x100 tiles are going to be used")
         self.output_bands = output_bands
@@ -52,8 +53,9 @@ class S2Worker:
                     gr = S2Granule(_path, spatial_resolution, self.output_bands, slice_index, target_projection,
                                    polygon=self.polygon)
                     self.granules.append(gr)
-            except Exception as _:
+            except Exception as e:
                 log.error(f"Did not find raster dataset in {_path}")
+                raise e
         if len(self.granules) == 0:
             raise Exception("Initialization failed")
         #  The result of masking is stored in this variable, "B01": numpy.array, etc.
@@ -123,6 +125,11 @@ class S2Worker:
         band = list(granule.bands[self.spatial_resolution].values())[-1]
         band.load_raster()
         return band.raster_image.shape
+
+    def get_projection(self):
+        if len(self.granules) == 0:
+            return None
+        return self.granules[-1].get_projection()
 
     def __str__(self):
         return f"Dataset: {self.main_dataset_path}\n" \

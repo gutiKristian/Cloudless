@@ -206,9 +206,10 @@ class Downloader:
         if not check_sum:
             log.warning("Check sum not provided")
             return True
-        return Downloader.calculate_md5(path) == check_sum
+        return Downloader.calculate_hash_unix(path, 'md5sum') == check_sum or Downloader.calculate_hash_unix(path, 'sha3sum -a 256') == check_sum
 
-    # downloading is triggered by the user, each time he calls this method
+        # downloading is triggered by the user, each time he calls this method
+
     def download_granule_full(self, unzip: bool = True):
         """
         Downloads entire granule dataset, all meta data and spatial resolution images.
@@ -356,7 +357,6 @@ class Downloader:
                             "AND beginposition:{}".format(self.platform_name, self.product_type,
                                                           self.__obj_cache['cloud'], self.__obj_cache['time'])
         # suffix = "&rows=100&format=json"
-        # TODO: In here we should check for more than > 100 and build queries for them as well
         if self.polygon:
             self.__obj_cache['polygon'] = True
             return [result + ' AND footprint:"Intersects(Polygon(({})))")'.format(
@@ -386,15 +386,13 @@ class Downloader:
         #  NEW! : URLS ARE WITHOUT &rows=100&format=json SUFFIX FOR EASIER PAGING IF NEEDED
         self.__obj_cache['urls'] = self.__build_info_queries()
         for url in self.__obj_cache['urls']:
-            url += "&rows=100&format=json"  # Add suffix | in post init queries add suffix based on overall_datasets
+            url += "&start=0&rows=100&format=json"  # Add suffix | in post init queries add suffix based on overall_datasets
+            self.__obj_cache['requests'][url] = pandas.read_json(self.session.get(url).content)['feed']
+            self.overall_datasets += int(self.__obj_cache['requests'][url]['opensearch:totalResults'])
             if self.overall_datasets > 0:
                 log.info("Required minimum of datasets achieved.")
                 return
-            self.__obj_cache['requests'][url] = pandas.read_json(self.session.get(url).content)['feed']
-            self.overall_datasets += int(self.__obj_cache['requests'][url]['opensearch:totalResults'])
-        if self.overall_datasets > 0:
-            log.info("Required minimum of datasets achieved.")
-            return
+
         raise IncorrectInput("Not enough datasets to download or run the pipeline for this input")
 
     def __parse_cached_response(self):
@@ -408,10 +406,11 @@ class Downloader:
         urls = list(self.__obj_cache['requests'].values())
         entries = []
         for url in urls:
-            entries += url['entry']
+            if type(url['entry']) == list:
+                entries += url['entry']
+            else:
+                entries.append(url['entry'])
 
-        if type(entries) == dict:
-            entries = [entries]
         for entry in entries:
             mercator = extract_mercator(entry['title'])
             if mercator not in self.__cache:
@@ -437,8 +436,8 @@ class Downloader:
                 else:
                     # Already have full request just parse it
                     break
+            url += suffix.format(0)  # not supported outside polygon definition
             if url not in self.__obj_cache['requests']:
-                url += suffix.format(100)  # not supported outside polygon definition
                 self.__obj_cache['requests'][url] = pandas.read_json(self.session.get(url).content)['feed']
             # entry for uuid is just dict
         self.__parse_cached_response()
@@ -446,14 +445,14 @@ class Downloader:
     #  Static
 
     @staticmethod
-    def calculate_md5(path: str):
+    def calculate_hash_unix(path: str, _hash: str):
         process = None
         if platform == "win32":
             # process = subprocess.Popen(f"CertUtil -hashfile {path} MD5", shell=True,
             #                            stdout=subprocess.PIPE)
             return None
         else:
-            process = subprocess.Popen(f"md5sum {path}", shell=True,
+            process = subprocess.Popen(f"{_hash} {path}", shell=True,
                                        stdout=subprocess.PIPE)
         out = process.communicate()
         if len(out) < 1:

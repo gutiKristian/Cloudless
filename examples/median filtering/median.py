@@ -1,5 +1,8 @@
 """
 Do the median filtering on each band -  R, G, B
+Do the filtering only on pixels with values 0 or 255 this is not the case (I'll update it later)
+Please also note that this aims to improve only the visual aspect of created mosaic, if you want to
+commit a further analysis on the data do not do this! This operation alters the values and may devalue the analysis.
 """
 import rasterio
 from skimage.morphology import disk
