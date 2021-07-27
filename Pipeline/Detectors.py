@@ -51,6 +51,7 @@ class S2Detectors:
         # linear transformation
         return 1.5 * (ndvi + 1)
 
+    # TODO: After some generalization add l1c
     @staticmethod
     def sentinel_cloudless(g: S2Granule, probability: bool = False) -> np.ndarray:
         """

@@ -312,7 +312,3 @@ def profile_for_rgb(profile: rasterio.profiles.Profile) -> rasterio.profiles.Pro
     profile['blockysize'] = 256
     profile['nodata'] = 0
     return profile
-
-
-def supported_granule_type(_type: str) -> bool:
-    return _type in ["L1C", "L2A"]
