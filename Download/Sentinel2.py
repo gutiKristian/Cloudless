@@ -189,10 +189,9 @@ class Downloader:
         return Downloader.calculate_hash_unix(path, 'md5sum') == check_sum or Downloader.calculate_hash_unix(path,
                                                                                                              'sha3sum -a 256') == check_sum
 
-        # downloading is triggered by the user, each time he calls this method
-
     def download_granule_full(self, unzip: bool = True):
         """
+        Generator implementation. This downloads the granule only when you ask for it.
         Downloads entire granule dataset, all meta data and spatial resolution images.
         File will be structured in .SAFE format. Yields path to the downloaded content.
         """
@@ -223,56 +222,63 @@ class Downloader:
 
         log.info("Everything downloaded")
 
-    # TODO: Threading
     def download_granule_bands(self, bands: List[str] = None, primary_spatial_res: Optional[str] = None):
         """
+        Generator implementation. This downloads the granule only when you ask for it.
         @param primary_spatial_res: 20 -> 20m, 10 -> 10m, 60 -> 60m
         @param bands: ["B01", ... ]
         """
+        bands = self.__download_bands_checker(bands, primary_spatial_res)
+        self.__before_download()
+        for mercator, entries in self.__get_next_download():
+            working_path = self.root_path + mercator  # path where all datasets are going to be downloaded
+            status = self.__download_data(entries, working_path, bands, primary_spatial_res)
+            if status:
+                yield working_path
+        log.info("All downloaded")
+
+    def __download_bands_checker(self, bands: List[str] = None, primary_spatial_res: Optional[str] = None):
         # Check if spatial resolution for L2A is Ok
         if self.product_type == "S2MSI2A" and \
                 (primary_spatial_res is None or
                  (primary_spatial_res is not None and primary_spatial_res not in ["10m", "20m", "60m"])):
             raise ValueError("Bad spatial resolution or None")
-        self.__before_download()
         # Check if provided bands are Ok
         if bands is None and self.product_type == "S2MSI2A":
             prim = 60 if primary_spatial_res == "60m" else (20 if primary_spatial_res == "20m" else 10)
             bands = bands_for_resolution(prim)
         elif bands is None:
             raise IncorrectInput("Please specify L1C bands")
-        # Download
-        status = True  # If the dataset health is ok
-        for mercator, entries in self.__get_next_download():
-            working_path = self.root_path + mercator  # path where all datasets are going to be downloaded
-            Downloader.prepare_dir(working_path)
-            for entry in entries:
-                data_set_path = working_path + os.path.sep + entry['title'] + ".SAFE" + os.path.sep
-                Downloader.prepare_dir(data_set_path)
-                manifest = self.download_meta_data(Downloader.manifest_url.format(entry["id"], entry["title"]),
-                                                   data_set_path + "manifest.safe")
-                manifest_imgs = Downloader.parse_manifest(manifest)
-                meta_data = self.download_meta_data(
-                    Downloader.meta_url.format(entry["id"], entry["title"], self.meta_data_name),
-                    data_set_path + self.meta_data_name)
-                raster_urls = None
-                if self.product_type == "S2MSI2A":
-                    raster_urls = Downloader.get_raster_urls_l2a(meta_data, entry, primary_spatial_res, bands)
-                else:
-                    raster_urls = Downloader.get_raster_urls_l1c(meta_data, entry, bands)
-                results = []
-                for url, name in raster_urls:
-                    check_sum = self.__extract_check_sum(name, manifest_imgs)
-                    results.append(self.download_file(url, data_set_path + name + ".jp2", check_sum=check_sum))
-                #  Check if there's corrupted file (all check sums must match otherwise this dataset will be discarded)
-                status = all(results)
-                if not status:
-                    log.warning("Corrupted download this dataset will be discarded.")
-                    shutil.rmtree(data_set_path)
-                else:
-                    log.debug("Check sum OK!")
-            yield working_path
-        log.info("All downloaded")
+        return bands
+
+    def __download_data(self, entries, working_path, bands, primary_spatial_res):
+        Downloader.prepare_dir(working_path)
+        for entry in entries:
+            data_set_path = working_path + os.path.sep + entry['title'] + ".SAFE" + os.path.sep
+            Downloader.prepare_dir(data_set_path)
+            manifest = self.download_meta_data(Downloader.manifest_url.format(entry["id"], entry["title"]),
+                                               data_set_path + "manifest.safe")
+            manifest_imgs = Downloader.parse_manifest(manifest)
+            meta_data = self.download_meta_data(
+                Downloader.meta_url.format(entry["id"], entry["title"], self.meta_data_name),
+                data_set_path + self.meta_data_name)
+            raster_urls = None
+            if self.product_type == "S2MSI2A":
+                raster_urls = Downloader.get_raster_urls_l2a(meta_data, entry, primary_spatial_res, bands)
+            else:
+                raster_urls = Downloader.get_raster_urls_l1c(meta_data, entry, bands)
+            results = []
+            for url, name in raster_urls:
+                check_sum = Downloader.extract_check_sum(name, manifest_imgs)
+                results.append(self.download_file(url, data_set_path + name + ".jp2", check_sum=check_sum))
+            #  Check if there's corrupted file (all check sums must match otherwise this dataset will be discarded)
+            status = all(results)
+            if not status:
+                log.warning("Corrupted download this dataset will be discarded.")
+                shutil.rmtree(data_set_path)
+            else:
+                log.debug("Check sum OK!")
+            return status
 
     # all_... methods download everything at once
     def download_full_all(self, unzip: bool = False) -> List[str]:
@@ -293,7 +299,8 @@ class Downloader:
 
     #  Mangled
 
-    def __extract_check_sum(self, name, manifest_imgs) -> Optional[str]:
+    @staticmethod
+    def extract_check_sum(name, manifest_imgs) -> Optional[str]:
         """
         index and res attributes are there for backward compatibility idk why are the manifests different
         """
