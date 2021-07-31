@@ -110,7 +110,11 @@ class Downloader:
             f.flush()
         return response.text
 
-    def __get_group_matches(self, spatial: str, meta: str, result, bands, entry) -> set:
+    @staticmethod
+    def extract_l2a_urls(spatial: str, meta: str, result, bands, entry) -> set:
+        """
+        Extract image file data information from metadata file
+        """
         pattern = re.compile(
             r'<IMAGE_FILE>GRANULE/([0-9A-Z_]+)/IMG_DATA/R{}/([0-9A-Z_]+_(.*)_{})</IMAGE_FILE>'.format(spatial,
                                                                                                       spatial))
@@ -136,8 +140,14 @@ class Downloader:
                 (Downloader.raster_url_l1c.format(entry["id"], entry["title"], m.group(1), m.group(2)), m.group(2)))
         return raster_urls
 
-    def get_raster_urls(self, meta, entry, spatial_res, bands):
+    @staticmethod
+    def get_raster_urls_l2a(meta, entry, spatial_res, bands):
         """
+        Function tries to extract and create urls for desired bands and spatial resolution.
+        If there's a band that is not present in specified spatial resolution, this band is going to be pulled either
+        from lower or higher spatial resolution.
+        For instance band B08 is only present in 10m spatial res. and therefore when we ask for this band with spatial
+        resolution set to 60m, 10m band is downloaded.
         @param: meta - content of xml in string form
         @param: entry - data of the tile from the request
         @param: what spatial resolution should be
@@ -145,21 +155,21 @@ class Downloader:
         """
         bands = set(bands)
         raster_urls = []
-        bands = self.__get_group_matches(spatial_res, meta, raster_urls, bands, entry)
+        bands = Downloader.extract_l2a_urls(spatial_res, meta, raster_urls, bands, entry)
 
         if len(bands) == 0:
             return raster_urls
 
         if spatial_res != "10m":
-            bands = self.__get_group_matches("10m", meta, raster_urls, bands, entry)
+            bands = Downloader.extract_l2a_urls("10m", meta, raster_urls, bands, entry)
             if len(bands) == 0:
                 return raster_urls
         if spatial_res != "20m":
-            bands = self.__get_group_matches("20m", meta, raster_urls, bands, entry)
+            bands = Downloader.extract_l2a_urls("20m", meta, raster_urls, bands, entry)
             if len(bands) == 0:
                 return raster_urls
         if spatial_res != "60m":
-            bands = self.__get_group_matches("10m", meta, raster_urls, bands, entry)
+            bands = Downloader.extract_l2a_urls("60m", meta, raster_urls, bands, entry)
         log.warning(f"Could not find {bands}.")
         return raster_urls
 
@@ -248,7 +258,7 @@ class Downloader:
                     data_set_path + self.meta_data_name)
                 raster_urls = None
                 if self.product_type == "S2MSI2A":
-                    raster_urls = self.get_raster_urls(meta_data, entry, primary_spatial_res, bands)
+                    raster_urls = Downloader.get_raster_urls_l2a(meta_data, entry, primary_spatial_res, bands)
                 else:
                     raster_urls = Downloader.get_raster_urls_l1c(meta_data, entry, bands)
                 results = []
