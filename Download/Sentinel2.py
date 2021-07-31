@@ -70,11 +70,16 @@ class Downloader:
         cloud_coverage = cloud_coverage if cloud_coverage else [0, 95]  # default value
         if not Downloader.is_valid_cloud_cov(cloud_coverage):
             raise IncorrectInput("Bad format: cloud coverage.")
+        if not Downloader.is_valid_sentinel_type(product_type):
+            raise IncorrectInput("Invalid sentinel type, supported: S2MSI2A, S2MSI1C")
         self.cloud_coverage = cloud_coverage
         # if not Downloader.is_valid_date_range(date):
         #     raise IncorrectInput("Bad format: date")
         self.date = date
         self.product_type = product_type
+        self.meta_data_name = "MTD_MSIL2A.xml"
+        if self.product_type == "S2MSI1C":
+            self.meta_data_name = "MTD_MSIL1C.xml"
         self.tile_uuids = uuid
         self.mercator_tiles = []
         self.validate_mercator_tiles(mercator_tiles)
@@ -90,39 +95,6 @@ class Downloader:
         self.__minimum_requirements()
 
     #  'Public'
-    # TODO: generalize to remove duplicates
-    def download_l1c(self, bands):
-        if self.product_type != "S2MSI1C":
-            raise ValueError("Bad product type")
-        self.__before_download()
-        status = True
-        for mercator, entries in self.__get_next_download():
-            working_path = self.root_path + mercator
-            Downloader.prepare_dir(working_path)
-            for entry in entries:
-                data_set_path = working_path + os.path.sep + entry['title'] + ".SAFE" + os.path.sep
-                Downloader.prepare_dir(data_set_path)
-                manifest = self.download_meta_data(Downloader.manifest_url.format(entry["id"], entry["title"]),
-                                                   data_set_path + "manifest.safe")
-                manifest_imgs = Downloader.parse_manifest(manifest)
-                meta_data = self.download_meta_data(
-                    Downloader.meta_url.format(entry["id"], entry["title"], "MTD_MSIL1C.xml"),
-                    data_set_path + "MTD_MSIL1C.xml")
-                raster_urls = Downloader.get_raster_urls_l1c(meta_data, entry, bands)
-                results = []
-                for url, name in raster_urls:
-                    check_sum = self.__extract_check_sum(name, manifest_imgs)
-                    results.append(self.download_file(url, data_set_path + name + ".jp2", check_sum=check_sum))
-                #  Check if there's corrupted file (all check sums must match otherwise this dataset will be discarded)
-                status = all(results)
-                if not status:
-                    log.warning("Corrupted download this dataset will be discarded.")
-                    shutil.rmtree(data_set_path)
-                else:
-                    log.debug("Check sum OK!")
-            yield working_path
-            log.info("All downloaded")
-
     def download_meta_data(self, url, filepath) -> str:
         """
         FILEPATH MUST INCLUDE THE NAME OF THE FILE! FOR INSTANCE DOWNLOADING
@@ -243,17 +215,24 @@ class Downloader:
         log.info("Everything downloaded")
 
     # TODO: Threading
-    def download_granule_bands(self, primary_spatial_res: str, bands: List[str] = None):
+    def download_granule_bands(self, bands: List[str] = None, primary_spatial_res: str = None):
         """
         @param primary_spatial_res: 20 -> 20m, 10 -> 10m, 60 -> 60m
         @param bands: ["B01", ... ]
         """
-        if primary_spatial_res not in ["10m", "20m", "60m"]:
-            raise ValueError("Wrong spatial resolution")
+        # Check if spatial resolution for L2A is Ok
+        if self.product_type == "S2MSI2A" and \
+                (primary_spatial_res is None or
+                 (primary_spatial_res is not None and primary_spatial_res not in ["10m", "20m", "60m"])):
+            raise ValueError("Bad spatial resolution or None")
         self.__before_download()
-        if bands is None:
+        # Check if provided bands are Ok
+        if bands is None and self.product_type == "S2MSI2A":
             prim = 60 if primary_spatial_res == "60m" else (20 if primary_spatial_res == "20m" else 10)
             bands = bands_for_resolution(prim)
+        elif bands is None:
+            raise IncorrectInput("Please specify L1C bands")
+        # Download
         status = True  # If the dataset health is ok
         for mercator, entries in self.__get_next_download():
             working_path = self.root_path + mercator  # path where all datasets are going to be downloaded
@@ -265,9 +244,13 @@ class Downloader:
                                                    data_set_path + "manifest.safe")
                 manifest_imgs = Downloader.parse_manifest(manifest)
                 meta_data = self.download_meta_data(
-                    Downloader.meta_url.format(entry["id"], entry["title"], "MTD_MSIL2A.xml"),
-                    data_set_path + "MTD_MSIL2A.xml")
-                raster_urls = self.get_raster_urls(meta_data, entry, primary_spatial_res, bands)
+                    Downloader.meta_url.format(entry["id"], entry["title"], self.meta_data_name),
+                    data_set_path + self.meta_data_name)
+                raster_urls = None
+                if self.product_type == "S2MSI2A":
+                    raster_urls = self.get_raster_urls(meta_data, entry, primary_spatial_res, bands)
+                else:
+                    raster_urls = Downloader.get_raster_urls_l1c(meta_data, entry, bands)
                 results = []
                 for url, name in raster_urls:
                     check_sum = self.__extract_check_sum(name, manifest_imgs)
@@ -528,3 +511,7 @@ class Downloader:
                     zip_ref.extractall(path)
                 os.remove(abs_path)
                 print("UnZipped : {}".format(path))
+
+    @staticmethod
+    def is_valid_sentinel_type(_type):
+        return _type in ["S2MSI2A", "S2MSI1C"]
