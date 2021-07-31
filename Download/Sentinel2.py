@@ -237,6 +237,17 @@ class Downloader:
                 yield working_path
         log.info("All downloaded")
 
+    def download_granule_bands_threads(self, bands: List[str] = None, primary_spatial_res: Optional[str] = None):
+        """
+        Downloads all the desired data at once with support of threads.
+        """
+        bands = self.__download_bands_checker(bands, primary_spatial_res)
+        self.__before_download()
+        data = list(self.__get_next_download())
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            for mercator, entries in data:
+                executor.submit(self.__download_data, entries, self.root_path + mercator, bands, primary_spatial_res)
+
     def __download_bands_checker(self, bands: List[str] = None, primary_spatial_res: Optional[str] = None):
         # Check if spatial resolution for L2A is Ok
         if self.product_type == "S2MSI2A" and \
