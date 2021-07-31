@@ -90,7 +90,7 @@ class Downloader:
         self.__minimum_requirements()
 
     #  'Public'
-
+    # TODO: generalize to remove duplicates
     def download_l1c(self, bands):
         if self.product_type != "S2MSI1C":
             raise ValueError("Bad product type")
@@ -109,14 +109,12 @@ class Downloader:
                     Downloader.meta_url.format(entry["id"], entry["title"], "MTD_MSIL1C.xml"),
                     data_set_path + "MTD_MSIL1C.xml")
                 raster_urls = Downloader.get_raster_urls_l1c(meta_data, entry, bands)
-                futures = []
-                with ThreadPoolExecutor(max_workers=10) as executor:
-                    for url, name in raster_urls:
-                        check_sum = self.__extract_check_sum(name, manifest_imgs)
-                        futures.append(executor.submit(self.download_file, url, data_set_path + name + ".jp2",
-                                                       check_sum=check_sum))
-                for f in futures:
-                    status = status and f.result()
+                results = []
+                for url, name in raster_urls:
+                    check_sum = self.__extract_check_sum(name, manifest_imgs)
+                    results.append(self.download_file(url, data_set_path + name + ".jp2", check_sum=check_sum))
+                #  Check if there's corrupted file (all check sums must match otherwise this dataset will be discarded)
+                status = all(results)
                 if not status:
                     log.warning("Corrupted download this dataset will be discarded.")
                     shutil.rmtree(data_set_path)
@@ -206,7 +204,8 @@ class Downloader:
         if not check_sum:
             log.warning("Check sum not provided")
             return True
-        return Downloader.calculate_hash_unix(path, 'md5sum') == check_sum or Downloader.calculate_hash_unix(path, 'sha3sum -a 256') == check_sum
+        return Downloader.calculate_hash_unix(path, 'md5sum') == check_sum or Downloader.calculate_hash_unix(path,
+                                                                                                             'sha3sum -a 256') == check_sum
 
         # downloading is triggered by the user, each time he calls this method
 
@@ -243,6 +242,7 @@ class Downloader:
 
         log.info("Everything downloaded")
 
+    # TODO: Threading
     def download_granule_bands(self, primary_spatial_res: str, bands: List[str] = None):
         """
         @param primary_spatial_res: 20 -> 20m, 10 -> 10m, 60 -> 60m
@@ -268,15 +268,12 @@ class Downloader:
                     Downloader.meta_url.format(entry["id"], entry["title"], "MTD_MSIL2A.xml"),
                     data_set_path + "MTD_MSIL2A.xml")
                 raster_urls = self.get_raster_urls(meta_data, entry, primary_spatial_res, bands)
-                futures = []
-                with ThreadPoolExecutor(max_workers=10) as executor:
-                    for url, name in raster_urls:
-                        check_sum = self.__extract_check_sum(name, manifest_imgs)
-                        futures.append(executor.submit(self.download_file, url, data_set_path + name + ".jp2",
-                                                       check_sum=check_sum))
-                        # status = self.download_file(url, data_set_path + name + ".jp2", check_sum=check_sum)
-                for f in futures:
-                    status = status and f.result()
+                results = []
+                for url, name in raster_urls:
+                    check_sum = self.__extract_check_sum(name, manifest_imgs)
+                    results.append(self.download_file(url, data_set_path + name + ".jp2", check_sum=check_sum))
+                #  Check if there's corrupted file (all check sums must match otherwise this dataset will be discarded)
+                status = all(results)
                 if not status:
                     log.warning("Corrupted download this dataset will be discarded.")
                     shutil.rmtree(data_set_path)
@@ -291,10 +288,7 @@ class Downloader:
         Downloads whole dataset and every requested tile.
         Returns list of paths to the downloaded content.
         """
-        paths = []
-        for e in self.download_granule_full(unzip=unzip):
-            paths.append(e)
-        return paths
+        return list(self.download_granule_full(unzip=unzip))
 
     def download_bands_all(self, primary_spatial_res: str, bands: List[str] = None):
         """
@@ -303,10 +297,7 @@ class Downloader:
         @param bands: required bands
         @return: paths to the files
         """
-        paths = []
-        for e in self.download_granule_bands(primary_spatial_res, bands):
-            paths.append(e)
-        return paths
+        return list(self.download_granule_bands(primary_spatial_res, bands))
 
     #  Mangled
 
