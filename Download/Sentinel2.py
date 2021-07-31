@@ -197,7 +197,6 @@ class Downloader:
         File will be structured in .SAFE format. Yields path to the downloaded content.
         """
         self.__before_download()
-
         for mercator, entries in self.__get_next_download():
             working_path = self.root_path + os.path.sep + mercator
             # create directory mercator and download the entries
@@ -225,7 +224,7 @@ class Downloader:
         log.info("Everything downloaded")
 
     # TODO: Threading
-    def download_granule_bands(self, bands: List[str] = None, primary_spatial_res: str = None):
+    def download_granule_bands(self, bands: List[str] = None, primary_spatial_res: Optional[str] = None):
         """
         @param primary_spatial_res: 20 -> 20m, 10 -> 10m, 60 -> 60m
         @param bands: ["B01", ... ]
@@ -290,7 +289,7 @@ class Downloader:
         @param bands: required bands
         @return: paths to the files
         """
-        return list(self.download_granule_bands(primary_spatial_res, bands))
+        return list(self.download_granule_bands(bands, primary_spatial_res))
 
     #  Mangled
 
