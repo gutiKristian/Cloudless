@@ -1,9 +1,7 @@
-import abc
 from datetime import datetime
 from xml.etree import ElementTree  # xml
 
 import numpy as np
-from abc import ABC, abstractmethod
 import pyproj
 import shapely.ops
 from osgeo import gdal
@@ -11,45 +9,27 @@ from Pipeline.Band import *
 from Pipeline.utils import *
 from Pipeline.logger import log
 from shapely.geometry import Polygon
-from Parser import S2Parser
 
 gdal.UseExceptions()
 
 
-class Granule(ABC):
-
-    def __init__(self, path: str, spatial_res: int, slice_index: int, t_srs: str, polygon: Optional[Polygon] = None):
-        """
-        Base class for granule, init only the basic information and check their validity.
-        """
+class S2Granule:
+    # TODO: move some logic to the parser
+    def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1,
+                 t_srs: str = 'EPSG:32633', granule_type: str = "L2A", polygon: Optional[Polygon] = None):
+        # TODO: after reverting gen changes...reformat validation
+        if not is_dir_valid(path):
+            raise FileNotFoundError("Dataset has not been found !")
+        if not supported_granule_type(granule_type):
+            raise ValueError("This granule type is not supported !")
         self.path = path
         self.spatial_resolution = spatial_res
         self.slice_index = slice_index
         self.t_srs = t_srs
         self.polygon = polygon
-
-        if not is_dir_valid(path):
-            raise FileNotFoundError("Dataset has not been found !")
-
-        if self.spatial_resolution < 1:
-            raise ValueError("Incorrect spatial resolution")
-
-        if self.slice_index < 1:
-            raise ValueError("Incorrect slice index")
-
-    @abstractmethod
-    def get_projection(self):
-        raise NotImplemented
-
-
-class S2Granule(Granule):
-    # TODO: move some logic to the parser
-    def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1,
-                 t_srs: str = 'EPSG:32633', granule_type: str = "L2A", polygon: Optional[Polygon] = None):
-        super().__init__(path, spatial_res, slice_index, t_srs, polygon)
         self.granule_type = granule_type
         self.desired_bands = desired_bands
-        self.meta_data_path = S2Parser.get_metadata_path(self.path, self.granule_type)
+        self.meta_data_path = get_metadata_path(self.path, self.granule_type)
         self.meta_data_gdal = None
         self.meta_data = None
         self.data_take = None
