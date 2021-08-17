@@ -8,6 +8,7 @@ from rasterio import dtypes as rastTypes
 from concurrent.futures import ThreadPoolExecutor
 from shapely.geometry import box
 
+
 class S2Worker:
 
     def __init__(self, path: str, spatial_resolution: int, slice_index: int = 1, output_bands: List[str] = [],

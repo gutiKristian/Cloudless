@@ -9,25 +9,27 @@ from Pipeline.Band import *
 from Pipeline.utils import *
 from Pipeline.logger import log
 from shapely.geometry import Polygon
+
 gdal.UseExceptions()
 
 
 class S2Granule:
-
+    # TODO: move some logic to the parser
     def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1,
                  t_srs: str = 'EPSG:32633', granule_type: str = "L2A", polygon: Optional[Polygon] = None):
+        # TODO: after reverting gen changes...reformat validation
         if not is_dir_valid(path):
             raise FileNotFoundError("Dataset has not been found !")
         if not supported_granule_type(granule_type):
             raise ValueError("This granule type is not supported !")
         self.path = path
-        self.granule_type = granule_type
         self.spatial_resolution = spatial_res
-        self.desired_bands = desired_bands
+        self.slice_index = slice_index
         self.t_srs = t_srs
         self.polygon = polygon
-        self.meta_data_path = self.path + os.path.sep + (
-            "MTD_MSIL2A.xml" if granule_type == "L2A" else "MTD_MSIL1C.xml")
+        self.granule_type = granule_type
+        self.desired_bands = desired_bands
+        self.meta_data_path = get_metadata_path(self.path, self.granule_type)
         self.meta_data_gdal = None
         self.meta_data = None
         self.data_take = None
@@ -39,7 +41,6 @@ class S2Granule:
             raise Exception("None or not enough datasets have been provided!")
         self.slice_index = slice_index
         self.bands = self.__to_band_dictionary()
-        self.cloud_index = 0
         self.temp = {}
         self.proj = self.get_projection()
         if self.polygon is not None:
