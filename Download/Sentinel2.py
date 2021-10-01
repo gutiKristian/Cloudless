@@ -237,7 +237,7 @@ class Downloader:
                 yield working_path
         log.info("All downloaded")
 
-    def download_granule_bands_threads(self, bands: List[str] = None, primary_spatial_res: str = None):
+    def download_granule_bands_threads(self, primary_spatial_res: str, bands: List[str] = None):
         """
         Downloads all the desired data at once with support of threads.
         """
@@ -248,7 +248,7 @@ class Downloader:
             for mercator, entries in data:
                 executor.submit(self.__download_data, entries, self.root_path + mercator, bands, primary_spatial_res)
 
-    def __download_bands_checker(self, bands: List[str] = None, primary_spatial_res: str = None):
+    def __download_bands_checker(self, bands: List[str], primary_spatial_res: str):
         # Check if spatial resolution for L2A is Ok
         if self.product_type == "S2MSI2A" and \
                 (primary_spatial_res is None or
@@ -430,7 +430,7 @@ class Downloader:
         for url in self.__obj_cache['urls']:
             if self.__obj_cache['polygon']:
                 while self.overall_datasets > 100:
-                    base += 1
+                    base += 101
                     n_url = url
                     n_url += suffix.format(base)
                     self.overall_datasets -= 100
