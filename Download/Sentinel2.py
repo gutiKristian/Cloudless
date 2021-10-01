@@ -187,7 +187,7 @@ class Downloader:
             log.warning("Check sum not provided")
             return True
         return Downloader.calculate_hash_unix(path, 'md5sum') == check_sum or Downloader.calculate_hash_unix(path,
-                                                                                                             'sha3sum -a 256') == check_sum
+                                                                                                             'sha3sum -a 256').upper() == check_sum
 
     def download_granule_full(self, unzip: bool = True):
         """
@@ -244,9 +244,13 @@ class Downloader:
         bands = self.__download_bands_checker(bands, primary_spatial_res)
         self.__before_download()
         data = list(self.__get_next_download())
+        paths = []
         with ThreadPoolExecutor(max_workers=5) as executor:
             for mercator, entries in data:
-                executor.submit(self.__download_data, entries, self.root_path + mercator, bands, primary_spatial_res)
+                path = self.root_path + mercator
+                executor.submit(self.__download_data, entries, path, bands, primary_spatial_res)
+                paths.append(path)
+        return paths
 
     def __download_bands_checker(self, bands: List[str], primary_spatial_res: str):
         # Check if spatial resolution for L2A is Ok
