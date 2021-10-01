@@ -237,7 +237,7 @@ class Downloader:
                 yield working_path
         log.info("All downloaded")
 
-    def download_granule_bands_threads(self, bands: List[str] = None, primary_spatial_res: Optional[str] = None):
+    def download_granule_bands_threads(self, bands: List[str] = None, primary_spatial_res: str = None):
         """
         Downloads all the desired data at once with support of threads.
         """
@@ -248,7 +248,7 @@ class Downloader:
             for mercator, entries in data:
                 executor.submit(self.__download_data, entries, self.root_path + mercator, bands, primary_spatial_res)
 
-    def __download_bands_checker(self, bands: List[str] = None, primary_spatial_res: Optional[str] = None):
+    def __download_bands_checker(self, bands: List[str] = None, primary_spatial_res: str = None):
         # Check if spatial resolution for L2A is Ok
         if self.product_type == "S2MSI2A" and \
                 (primary_spatial_res is None or
@@ -264,6 +264,7 @@ class Downloader:
 
     def __download_data(self, entries, working_path, bands, primary_spatial_res):
         Downloader.prepare_dir(working_path)
+        status = False
         for entry in entries:
             data_set_path = working_path + os.path.sep + entry['title'] + ".SAFE" + os.path.sep
             Downloader.prepare_dir(data_set_path)
@@ -289,7 +290,7 @@ class Downloader:
                 shutil.rmtree(data_set_path)
             else:
                 log.debug("Check sum OK!")
-            return status
+        return status
 
     # all_... methods download everything at once
     def download_full_all(self, unzip: bool = False) -> List[str]:
@@ -391,7 +392,7 @@ class Downloader:
             self.__obj_cache['requests'][url] = pandas.read_json(self.session.get(url).content)['feed']
             self.overall_datasets += int(self.__obj_cache['requests'][url]['opensearch:totalResults'])
             if self.overall_datasets > 0:
-                log.info("Required minimum of datasets achieved.")
+                log.info("Required minimum of datasets achieved: {}".format(self.overall_datasets))
                 return
 
         raise IncorrectInput("Not enough datasets to download or run the pipeline for this input")
