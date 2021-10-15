@@ -87,11 +87,10 @@ class S2Detectors:
                 return slice_raster(g.slice_index, res)
             return res
 
-        l1c_raster = None
         necessary_bands = ["B01", "B02", "B04", "B05", "B08", "B8A", "B09", "B10", "B11", "B12"]
         #  This is generalized download, in this case we expect only one iteration
-        for p in downloader.download_granule_bands(necessary_bands):
-            l1c_raster = p + os.path.sep + os.listdir(p)[0]
+        p = list(downloader.download_granule_bands(necessary_bands))[-1]
+        l1c_raster = p + os.path.sep + os.listdir(p)[0]
 
         # Data will be automatically resampled during the creation of the granule
         l1c_granule = S2Granule(l1c_raster, 160, necessary_bands, granule_type="L1C")
