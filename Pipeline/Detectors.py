@@ -30,7 +30,7 @@ class S2Detectors:
         # filter clouds
         a = g["SCL"] > 7
         b = g["SCL"] < 11
-        c = g["SCL"] < 1  # no data
+        c = (g["SCL"] < 1) * 10  # no data - punish more
         return (a & b) | c
 
     @staticmethod
