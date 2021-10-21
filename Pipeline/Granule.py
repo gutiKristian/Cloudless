@@ -217,9 +217,10 @@ class S2Granule:
     def get_projection(self):
         return list(self.bands[self.spatial_resolution].values())[-1].profile["crs"]
 
-    def reproject_bands(self, target_projection: str):
-        for band in self.bands[self.spatial_resolution].values():
-            band.band_reproject(t_srs=target_projection)
+    def reproject_bands(self):
+        if self.get_projection() != self.t_srs:
+            for band in self.bands[self.spatial_resolution].values():
+                band.band_reproject(t_srs=self.t_srs)
 
     def __getitem__(self, item) -> Band:
         """
