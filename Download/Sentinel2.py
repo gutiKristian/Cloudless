@@ -187,7 +187,7 @@ class Downloader:
             log.warning("Check sum not provided")
             return True
         return Downloader.calculate_hash_unix(path, 'md5sum') == check_sum or Downloader.calculate_hash_unix(path,
-                                                                                                             'sha3sum -a 256').upper() == check_sum
+                                                                                                             'sha3sum -a 256').upper() == check_sum.upper()
 
     def download_granule_full(self, unzip: bool = True):
         """
