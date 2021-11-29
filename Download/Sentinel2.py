@@ -37,7 +37,7 @@ class Downloader:
                  date: datetime = (datetime.datetime.now() - datetime.timedelta(days=14), datetime.datetime.now()),
                  uuid: List[str] = None, cloud_coverage: List[int] = None, product_type: str = "S2MSI2A",
                  mercator_tiles: List[str] = None, text_search: str = None, platform_name: str = "Sentinel-2",
-                 time_str: str = None):
+                 time_str: str = None, filter_utm: List[str] = None):
         """
         TODO: path to credentials folder
         It is recommended to initialize object via class methods to prevent unexpected results for the user.
@@ -77,6 +77,7 @@ class Downloader:
         #     raise IncorrectInput("Bad format: date")
         self.date = date
         self.product_type = product_type
+        self.filter_utm = filter_utm
         self.meta_data_name = "MTD_MSIL2A.xml"
         if self.product_type == "S2MSI1C":
             self.meta_data_name = "MTD_MSIL1C.xml"
@@ -405,7 +406,7 @@ class Downloader:
         """
         Method parses responses for initial queries and sort them based on the mercator id (position)
         and after we download these data "mercator by mercator".
-        Response for Polygon is unstructured and messy for us, since we download the datasets by tiles
+        Response for Polygon is unstructured and messy for us (since we download the datasets by tiles)
         and therefore we are able to run pipeline meanwhile another granule(tile) dataset is downloading.
         """
         #  If there is only one result the request contains only dict to follow the pattern we will wrap it with list
@@ -419,6 +420,9 @@ class Downloader:
 
         for entry in entries:
             mercator = extract_mercator(entry['title'])
+            if self.filter_utm is not None:
+                if any(map(lambda x: x in mercator, self.filter_utm)):
+                    continue  # do not add this utm-mercator to the dataset
             if mercator not in self.__cache:
                 self.__cache[mercator] = []
             self.__cache[mercator].append(entry)
