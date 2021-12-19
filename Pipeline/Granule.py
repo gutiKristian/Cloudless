@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from xml.etree import ElementTree  # xml
 
@@ -14,10 +15,8 @@ gdal.UseExceptions()
 
 
 class S2Granule:
-    # TODO: move some logic to the parser
     def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1,
                  t_srs: str = 'EPSG:32633', granule_type: str = "L2A", polygon: Optional[Polygon] = None):
-        # TODO: after reverting gen changes...reformat validation
         if not is_dir_valid(path):
             raise FileNotFoundError("Dataset has not been found !")
         if not supported_granule_type(granule_type):
@@ -35,6 +34,8 @@ class S2Granule:
         self.data_take = None
         self.doy = 0
         self.paths_to_raster = None
+        self.granule_id = None
+        self.l1c_identifier = None
         self.__initialize_meta()
         self.__find_images()
         if self.paths_to_raster is None or len(self.paths_to_raster) < 2:
@@ -140,6 +141,20 @@ class S2Granule:
             log.info("Meta data initialized.")
         except Exception as e:
             log.warning("Worker continues without metadata file!")
+
+        # Get metadata manually
+        try:
+            reg = re.compile(r'(granuleIdentifier=)("([^"]*)")')
+            with open(self.meta_data_path, "r") as f:
+                for line in f:
+                    match = reg.findall(line)
+                    if len(match) > 0:
+                        # first match and last group
+                        self.granule_id = match[0][-1]
+                        break
+        except Exception as e:
+            log.error("Could not find granule id")
+
 
     def __extract_bands(self, paths) -> List[str]:
         """
