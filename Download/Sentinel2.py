@@ -37,7 +37,7 @@ class Downloader:
                  date: datetime = (datetime.datetime.now() - datetime.timedelta(days=14), datetime.datetime.now()),
                  uuid: List[str] = None, cloud_coverage: List[int] = None, product_type: str = "S2MSI2A",
                  mercator_tiles: List[str] = None, text_search: str = None, platform_name: str = "Sentinel-2",
-                 time_str: str = None, filter_utm: List[str] = None):
+                 time_str: str = None, filter_utm: List[str] = None, granule_identifier: List[str] = None):
         """
         TODO: path to credentials folder
         It is recommended to initialize object via class methods to prevent unexpected results for the user.
@@ -67,7 +67,7 @@ class Downloader:
         self.polygon = None
         if polygon is not None:
             self.polygon = Downloader.create_polygon(polygon)
-        cloud_coverage = cloud_coverage if cloud_coverage else [0, 95]  # default value
+        cloud_coverage = cloud_coverage if cloud_coverage else [0, 100]  # default value
         if not Downloader.is_valid_cloud_cov(cloud_coverage):
             raise IncorrectInput("Bad format: cloud coverage.")
         if not Downloader.is_valid_sentinel_type(product_type):
@@ -82,6 +82,7 @@ class Downloader:
         if self.product_type == "S2MSI1C":
             self.meta_data_name = "MTD_MSIL1C.xml"
         self.tile_uuids = uuid
+        self.granule_id = granule_identifier
         self.mercator_tiles = []
         self.validate_mercator_tiles(mercator_tiles)
         self.text_search = text_search
@@ -356,6 +357,12 @@ class Downloader:
         Build initial request for the required aoi or tiles. Method returns list of 1 url for polygon
         and list of urls for each tile if it is preferred method.
         """
+        # These first two methods specify the dataset so no need to use time, cloud cov. etc
+        if self.tile_uuids:
+            return [self.url + "?=(uuid:{})".format(uuid) for uuid in self.tile_uuids]
+        if self.granule_id:
+            return [self.url + "?=(granuleidentifier:{})".format(_id) for _id in self.granule_id]
+
         self.__obj_cache['cloud'] = "[{} TO {}]".format(self.cloud_coverage[0], self.cloud_coverage[1])
         self.__obj_cache['time'] = self.time_str if self.time_str is not None else \
             "[" + self.date[0].strftime("%Y-%m-%d") + "T00:00:00.000Z" + " TO " + self.date[1] \
@@ -370,15 +377,14 @@ class Downloader:
                 ",".join("{} {}".format(p[0], p[1]) for p in list(self.polygon.exterior.coords)))]  # + suffix
         if self.mercator_tiles:
             return [result + " AND *{}*)".format(tile) for tile in self.mercator_tiles]  # + suffix
-        if self.tile_uuids:
-            return [self.url + "?=(uuid:{})".format(uuid) for uuid in self.tile_uuids]
         return [result + " AND {} ".format(self.text_search)]  # + suffix
 
     def __minimum_requirements(self):
         """
         If the downloader was provided enough information to do his job.
         """
-        if not self.polygon and not self.tile_uuids and not self.mercator_tiles and not self.tile_uuids:
+        if not self.polygon and not self.tile_uuids and not self.mercator_tiles and not self.tile_uuids \
+                and not self.granule_id:
             log.warning("Area was not defined")
             if self.text_search:
                 log.info("I'll try to find some area indicators in text search")
