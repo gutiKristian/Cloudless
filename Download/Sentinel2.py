@@ -274,6 +274,15 @@ class Downloader:
         for entry in entries:
             data_set_path = working_path + os.path.sep + entry['title'] + ".SAFE" + os.path.sep
             Downloader.prepare_dir(data_set_path)
+
+            # Create dump file where we put the request about this file
+            try:
+                l1c_id = list(filter(lambda x: x['name'] == 'level1cpdiidentifier', entry['str']))[-1]['content']
+                with open(data_set_path + "dump.txt", "w") as f:
+                    f.write(l1c_id)
+            except Exception as e:
+                log.warning("Skipping dump file")
+
             manifest = self.download_meta_data(Downloader.manifest_url.format(entry["id"], entry["title"]),
                                                data_set_path + "manifest.safe")
             manifest_imgs = Downloader.parse_manifest(manifest)
