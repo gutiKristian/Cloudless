@@ -2,6 +2,7 @@ import logging
 import os
 import skimage.transform
 
+import Pipeline.utils
 from Download.DownloadExceptions import IncorrectInput
 from Pipeline.Granule import S2Granule
 from Pipeline.GranuleCalculator import GranuleCalculator
@@ -13,6 +14,7 @@ from Download.Sentinel2 import Downloader
 from skimage.exposure import rescale_intensity
 from s2cloudless import S2PixelCloudDetector
 from Pipeline.Plotting import Plot
+from Pipeline.utils import USER_NAME, PASSWORD
 
 
 class S2Detectors:
@@ -51,7 +53,7 @@ class S2Detectors:
         # linear transformation
         return 1.5 * (ndvi + 1)
 
-    # TODO: After some generalization add l1c
+    # TODO: Rewrite detector so it can be used in PerTile for PerPixel we already have smthng
     @staticmethod
     def sentinel_cloudless(g: S2Granule, probability: bool = False) -> np.ndarray:
         """
@@ -77,9 +79,11 @@ class S2Detectors:
         mercator = extract_mercator(g.path)
         # get credentials from file
         try:
-            downloader = Downloader("example", "thesis", root_path=working_path,
+            # if l1c_identifier is None downloader tries to use the datatake to look up l1c dataset
+            downloader = Downloader(USER_NAME, PASSWORD, root_path=working_path,
                                     date=(g.data_take, g.data_take),
-                                    product_type="S2MSI1C", mercator_tiles=[mercator])
+                                    product_type="S2MSI1C", mercator_tiles=[mercator],
+                                    granule_identifier=[g.l1c_identifier])
         except IncorrectInput:
             log.error("Did not find corresponding l1c this dataset wont be taken")
             res = np.ones(shape=(s2_get_resolution(g.spatial_resolution))) * 255
@@ -87,7 +91,9 @@ class S2Detectors:
                 return slice_raster(g.slice_index, res)
             return res
 
-        necessary_bands = ["B01", "B02", "B04", "B05", "B08", "B8A", "B09", "B10", "B11", "B12"]
+        necessary_bands = ["B01", "B02", "B03", "B04", "B05", "B08", "B8A", "B09", "B10", "B11", "B12"]
+        # without B03
+        desired_order = ["B01", "B02", "B04", "B05", "B08", "B8A", "B09", "B10", "B11", "B12"]
         #  This is generalized download, in this case we expect only one iteration
         p = list(downloader.download_granule_bands(necessary_bands))[-1]
         l1c_raster = p + os.path.sep + os.listdir(p)[0]
@@ -96,15 +102,24 @@ class S2Detectors:
         l1c_granule = S2Granule(l1c_raster, 160, necessary_bands, granule_type="L1C")
 
         #  Cloudless time, compute mask
-        data = l1c_granule.stack_bands(necessary_bands, dstack=True) / 10000.0
+        data = l1c_granule.stack_bands(desired_order=desired_order, dstack=True)
         l1c_granule.free_resources()
 
-        cloud_detector = S2PixelCloudDetector()
+        cloud_detector = S2PixelCloudDetector(
+            threshold=0.4,
+            average_over=4,
+            dilation_size=2,
+            all_bands=False
+        )
         product = None
+        product_name = ""
         if probability:
             product = cloud_detector.get_cloud_probability_maps(data)
+            product_name = "CLD_PROB"
         else:
             product = cloud_detector.get_cloud_masks(data)
+            product_name = "CLD_MASK"
+
         #  Mask is in 160m spatial resolution, we need to up-sample to working spatial res., using nearest interpolation
         #  0 (no clouds), 1 (clouds), 255 (no data)
         product = skimage.transform.resize(product, order=0, output_shape=s2_get_resolution(g.spatial_resolution))
