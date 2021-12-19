@@ -16,7 +16,8 @@ gdal.UseExceptions()
 
 class S2Granule:
     def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1,
-                 t_srs: str = 'EPSG:32633', granule_type: str = "L2A", polygon: Optional[Polygon] = None):
+                 t_srs: str = 'EPSG:32633', granule_type: str = "L2A", polygon: Optional[Polygon] = None,
+                 l1c_id: str = None):
         if not is_dir_valid(path):
             raise FileNotFoundError("Dataset has not been found !")
         if not supported_granule_type(granule_type):
@@ -35,7 +36,7 @@ class S2Granule:
         self.doy = 0
         self.paths_to_raster = None
         self.granule_id = None
-        self.l1c_identifier = None
+        self.l1c_identifier = l1c_id
         self.__initialize_meta()
         self.__find_images()
         if self.paths_to_raster is None or len(self.paths_to_raster) < 2:
