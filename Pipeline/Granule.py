@@ -154,6 +154,10 @@ class S2Granule:
                         # first match and last group
                         self.granule_id = match[0][-1]
                         break
+
+            with open(self.path + os.path.sep + "dump.txt") as f:
+                self.l1c_identifier = f.readline()
+
         except Exception as e:
             log.error("Could not find granule id")
 
