@@ -5,10 +5,17 @@ from typing import *
 import rasterio
 import glob
 from skimage import exposure
+
+from Download.Sentinel2 import Downloader
+from Pipeline.Granule import S2Granule
+from Pipeline.Task import S2CloudlessPerPixel
+from Pipeline.Worker import S2Worker
 from Pipeline.logger import log
 import subprocess
 from rasterio.enums import Resampling
 
+USER_NAME = "kristianson12"
+PASSWORD = "mosvegczzz"
 
 # --------------- FILE UTILS ---------------
 
@@ -322,3 +329,24 @@ def get_metadata_path(granule_path: str, granule_type: str) -> str:
     if not supported_granule_type(granule_type):
         raise NotImplemented
     return granule_path + os.path.sep + ("MTD_MSIL2A.xml" if granule_type == "L2A" else "MTD_MSIL1C.xml")
+
+
+# --------------- S2CLOUDLESS UTILS ------------------
+def download_l1c(worker: S2Worker) -> List[S2Granule]:
+    l1c_granules = []
+    for granule in worker.granules:
+        working_path_1c = granule.path + os.path.sep + "L1C"
+        downloader = Downloader(USER_NAME, PASSWORD, granule_identifier=[granule.l1c_identifier])
+        p = list(downloader.download_granule_bands(S2CloudlessPerPixel.bands_l1c))[-1]
+        l1c_raster = p + os.path.sep + os.listdir(p)[0]
+        # Data will be automatically resampled during the creation of the granule
+        l1c_granules.append(S2Granule(l1c_raster, 160, S2CloudlessPerPixel.bands_l1c, granule_type="L1C"))
+    return l1c_granules
+
+
+def create_cloud_product(granule: S2Granule, mask=False):
+    # Input is l1c granule and if we should compute binary mask or prob mask
+    assert granule.granule_type == "L1C"
+    #  Cloudless time, compute mask
+    data = granule.stack_bands(desired_order=S2CloudlessPerPixel.bands_l1c, dstack=True)
+    granule.free_resources()
