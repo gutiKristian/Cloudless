@@ -119,7 +119,8 @@ class S2Granule:
                 b = Band(band, slice_index=self.slice_index)
                 #  Automatically resample band to working spatial resolution
                 if b.profile["width"] != s2_get_resolution(self.spatial_resolution)[0]:
-                    b.resample(s2_get_resolution(self.spatial_resolution)[0] / b.profile["width"], delete=True)
+                    # b.resample(s2_get_resolution(self.spatial_resolution)[0] / b.profile["width"], delete=True)
+                    b.resample_gdal(self.spatial_resolution)
                 e_dict[self.spatial_resolution][key] = b
         for band in self.desired_bands:
             if band not in e_dict[self.spatial_resolution]:
@@ -178,7 +179,8 @@ class S2Granule:
         """
         b = Band(path_to_band, slice_index=self.slice_index)
         if b.profile["width"] != s2_get_resolution(self.spatial_resolution)[0]:
-            b.resample(s2_get_resolution(self.spatial_resolution)[0] / b.profile["width"], delete=True)
+            # b.resample(s2_get_resolution(self.spatial_resolution)[0] / b.profile["width"], delete=True)
+            b.resample_gdal(self.spatial_resolution)
         self.bands[self.spatial_resolution][key] = b
 
     def load_bands(self, desired_bands: List[str] = None) -> None:

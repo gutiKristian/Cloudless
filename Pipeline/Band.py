@@ -143,6 +143,18 @@ class Band:
             os.remove(self.path)
         self.path = self.path + "_res" + ext
 
+    def resample_gdal(self, resolution: int):
+        # resolution : for 160m use 160
+        # this method uses gdal for resampling
+        new_path, ext = os.path.splitext(self.path)
+        new_path += "_res.tif"
+        process = subprocess.Popen(f"gdal_translate -of GTiff -tr {resolution} {resolution} "
+                                   f"-r nearest \"{self.path}\" \"{new_path}\" -q", shell=True,
+                                   stdout=subprocess.PIPE)
+        process.wait()
+        os.remove(self.path)
+        self.path = new_path
+
     def free_resources(self) -> None:
         """
         Delete the pointers to the data and call garbage collector to free the memory.
