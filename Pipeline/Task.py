@@ -2,6 +2,7 @@ import gc
 from abc import ABC, abstractmethod
 
 import rasterio
+from s2cloudless import S2PixelCloudDetector
 
 from Pipeline.logger import log
 from Pipeline.Worker import S2Worker
@@ -13,6 +14,8 @@ from Pipeline.utils import *
 from numba.typed import List as LIST
 from Pipeline.Mask import S2JIT
 from Pipeline.Detectors import S2Detectors
+from Pipeline.Plotting import *
+from Download.Sentinel2 import Downloader
 
 
 class Task(ABC):
@@ -78,6 +81,13 @@ class NdviPerPixel(Task):
 
 
 class S2CloudlessPerPixel(Task):
+    bands_l1c = ["B01", "B02", "B04", "B05", "B08", "B8A", "B09", "B10", "B11", "B12"]
+    cloud_detector = S2PixelCloudDetector(
+        threshold=0.4,
+        average_over=4,
+        dilation_size=2,
+        all_bands=False
+    )
 
     @staticmethod
     def perform_computation(worker: S2Worker, constraint: int = 10) -> S2Granule:
@@ -95,7 +105,17 @@ class S2CloudlessPerPixel(Task):
         final_mask = np.ones(shape=(res_x, res_y), dtype=np.int) * 255
         #  First thing, we will sort the granules based on their doy, so we get the latest result
         worker.granules.sort(key=lambda x: x.doy)
-        #  Each iteration we are going to compute the mask and then run the jitted function on the data
+        #  Download the corresponding L1C datasets and compute the mask
+        l1c_granules = download_l1c(worker)
+        # ^They are in the same order as worker granules
+
+        # Create cloud masks
+        for i, gl1c in enumerate(l1c_granules, 0):
+            # Get cld prob
+            path = create_cloud_product(gl1c)
+            worker.granules[i].add_another_band(path, "CLD")
+
+        #  Do the masking
         log.info(f"{(len(worker.granules) - 1) // constraint + 1} iteration(s) expected!")
         for iteration in range((len(worker.granules) - 1) // constraint + 1):
             current_doy = LIST()
