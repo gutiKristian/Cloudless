@@ -182,9 +182,11 @@ class Downloader:
         with self.session.get(url, stream=True) as req:
             req.raise_for_status()
             with open(path, 'wb') as f:
-                for chunk in req.iter_content(chunk_size=chunk_size):
-                    f.write(chunk)
-                f.flush()
+                shutil.copyfileobj(req.raw, f, length=16*1024*1024)
+            # with open(path, 'wb') as f:
+            #     for chunk in req.iter_content(chunk_size=chunk_size):
+            #         f.write(chunk)
+            #     f.flush()
         if not check_sum:
             log.warning("Check sum not provided")
             return True
@@ -208,7 +210,7 @@ class Downloader:
                 zip_file = working_path + os.path.sep + entry['title'] + ".zip"
                 link = entry['link'][0]['href']
                 check_sum = self.session.get(entry['link'][1]['href'] + "/Checksum/Value/$value")
-                if not self.download_file(link, zip_file, check_sum=check_sum):
+                if not self.download_file(link, zip_file, check_sum=None):
                     log.error(f"File: {zip_file} wasn't downloaded properly")
                     os.remove(zip_file)
                 else:
@@ -368,9 +370,9 @@ class Downloader:
         """
         # These first two methods specify the dataset so no need to use time, cloud cov. etc
         if self.tile_uuids:
-            return [self.url + "?=(uuid:{})".format(uuid) for uuid in self.tile_uuids]
+            return [self.url + "search?q=(uuid:{})".format(uuid) for uuid in self.tile_uuids]
         if self.granule_id:
-            return [self.url + "?=(granuleidentifier:{})".format(_id) for _id in self.granule_id]
+            return [self.url + "search?q=(granuleidentifier:{})".format(_id) for _id in self.granule_id]
 
         self.__obj_cache['cloud'] = "[{} TO {}]".format(self.cloud_coverage[0], self.cloud_coverage[1])
         self.__obj_cache['time'] = self.time_str if self.time_str is not None else \
