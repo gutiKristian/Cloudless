@@ -2,6 +2,8 @@ import os
 import re
 import numpy
 from typing import *
+
+import numpy as np
 import rasterio
 import glob
 from skimage import exposure
@@ -344,9 +346,25 @@ def download_l1c(worker: S2Worker) -> List[S2Granule]:
     return l1c_granules
 
 
-def create_cloud_product(granule: S2Granule, mask=False):
+def create_cloud_product(granule: S2Granule, mask=False) -> str:
     # Input is l1c granule and if we should compute binary mask or prob mask
     assert granule.granule_type == "L1C"
     #  Cloudless time, compute mask
     data = granule.stack_bands(desired_order=S2CloudlessPerPixel.bands_l1c, dstack=True)
     granule.free_resources()
+    product = None
+    if mask:
+        product = S2CloudlessPerPixel.cloud_detector.get_cloud_masks(data)
+    else:
+        product = S2CloudlessPerPixel.cloud_detector.get_cloud_probability_maps(data)
+    # obtain profile from parsed band
+    band = granule.get_initialized_bands()[-1]
+    if len(band) < 1:
+        raise NotImplemented
+    prof = granule[band].profile
+    prof['dtype'] = "int" if mask else "float32"
+    path = os.path.join(granule.path, "CLD.tif")
+    with rasterio.open(path, "w", **prof) as cld:
+        cld.write(product, 1)
+    return path
+
