@@ -106,7 +106,7 @@ class S2CloudlessPerPixel(Task):
         #  First thing, we will sort the granules based on their doy, so we get the latest result
         worker.granules.sort(key=lambda x: x.doy)
         #  Download the corresponding L1C datasets and compute the mask
-        l1c_granules = download_l1c(worker)
+        l1c_granules = [download_l1c(granule) for granule in worker.granules]
         # ^They are in the same order as worker granules
 
         # Create cloud masks
@@ -119,13 +119,15 @@ class S2CloudlessPerPixel(Task):
         log.info(f"{(len(worker.granules) - 1) // constraint + 1} iteration(s) expected!")
         for iteration in range((len(worker.granules) - 1) // constraint + 1):
             current_doy = LIST()
-            current_masks = LIST()  # mind these are probability masks !!
+            # mind these are probability masks !! -> might also be bin. mask depends on params
+            # in per pixel it is better to work with probability masks
+            current_masks = LIST()
             current_data = LIST()
-            # Acquire first batch of granules, for instance constraint=4, granules=[0,1,2,3]
+            # Acquire first batch of granules, for instance constraint=4, granules=[0,1,2,3], second -> [4,5,6,7]
             granules = worker.granules[iteration * constraint: (iteration + 1) * constraint]
             for i, g in enumerate(granules, 0):
                 current_doy.append(g.doy)
-                current_masks.append(S2Detectors.sentinel_cloudless(g, probability=True))
+                current_masks.append(g["CLD"])
                 current_data.append(g.stack_bands(worker.output_bands))
             S2JIT.s2_cloud_probability_analysis(current_data, current_masks, current_doy, result, doy, final_mask)
             del current_data

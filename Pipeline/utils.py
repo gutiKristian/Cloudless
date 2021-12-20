@@ -19,6 +19,7 @@ from rasterio.enums import Resampling
 USER_NAME = "kristianson12"
 PASSWORD = "mosvegczzz"
 
+
 # --------------- FILE UTILS ---------------
 
 def is_dir_valid(path: str) -> bool:
@@ -334,16 +335,13 @@ def get_metadata_path(granule_path: str, granule_type: str) -> str:
 
 
 # --------------- S2CLOUDLESS UTILS ------------------
-def download_l1c(worker: S2Worker) -> List[S2Granule]:
-    l1c_granules = []
-    for granule in worker.granules:
-        working_path_1c = granule.path + os.path.sep + "L1C"
-        downloader = Downloader(USER_NAME, PASSWORD, granule_identifier=[granule.l1c_identifier])
-        p = list(downloader.download_granule_bands(S2CloudlessPerPixel.bands_l1c))[-1]
-        l1c_raster = p + os.path.sep + os.listdir(p)[0]
-        # Data will be automatically resampled during the creation of the granule
-        l1c_granules.append(S2Granule(l1c_raster, 160, S2CloudlessPerPixel.bands_l1c, granule_type="L1C"))
-    return l1c_granules
+def download_l1c(granule: S2Granule) -> S2Granule:
+    working_path_1c = granule.path + os.path.sep + "L1C"
+    downloader = Downloader(USER_NAME, PASSWORD, working_path_1c, granule_identifier=[granule.l1c_identifier])
+    p = list(downloader.download_granule_bands(S2CloudlessPerPixel.bands_l1c))[-1]
+    l1c_raster = p + os.path.sep + os.listdir(p)[0]
+    # Data will be automatically resampled during the creation of the granule
+    return S2Granule(l1c_raster, 160, S2CloudlessPerPixel.bands_l1c, granule_type="L1C")
 
 
 def create_cloud_product(granule: S2Granule, mask=False) -> str:
@@ -367,4 +365,3 @@ def create_cloud_product(granule: S2Granule, mask=False) -> str:
     with rasterio.open(path, "w", **prof) as cld:
         cld.write(product, 1)
     return path
-
