@@ -1,6 +1,4 @@
-import json
 import os
-import re
 import sys
 from sys import platform
 from typing import *
@@ -10,13 +8,11 @@ import threading
 from zipfile import ZipFile
 import pandas
 import requests
-import hashlib
 import re
 from shapely.geometry import Polygon
 from Pipeline.logger import log
-from Pipeline.utils import bands_for_resolution
+import Pipeline.utils as util
 import datetime
-from Pipeline.utils import extract_mercator, is_dir_valid
 from Download.DownloadExceptions import *
 from xml.dom import minidom
 from concurrent.futures import ThreadPoolExecutor
@@ -265,7 +261,7 @@ class Downloader:
         # Check if provided bands are Ok
         if bands is None and self.product_type == "S2MSI2A":
             prim = 60 if primary_spatial_res == "60m" else (20 if primary_spatial_res == "20m" else 10)
-            bands = bands_for_resolution(prim)
+            bands = util.bands_for_resolution(prim)
         elif bands is None:
             raise IncorrectInput("Please specify L1C bands")
         return bands
@@ -436,7 +432,7 @@ class Downloader:
                 entries.append(url['entry'])
 
         for entry in entries:
-            mercator = extract_mercator(entry['title'])
+            mercator = util.extract_mercator(entry['title'])
             if self.filter_utm is not None:
                 if any(map(lambda x: x in mercator, self.filter_utm)):
                     continue  # do not add this utm-mercator to the dataset
@@ -506,7 +502,7 @@ class Downloader:
 
     @staticmethod
     def prepare_dir(path: str):
-        if is_dir_valid(path):
+        if util.is_dir_valid(path):
             log.warning(f"Path: {path} already exists, the files in the directory will be deleted.")
             shutil.rmtree(path)
         os.mkdir(path)
