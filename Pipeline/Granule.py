@@ -110,6 +110,7 @@ class S2Granule:
         # spatial_res = int(re.findall(r'\d+', array[0])[-1])
         if self.spatial_resolution not in e_dict:
             e_dict[self.spatial_resolution] = {}
+        # TODO: use glob and just add the output bands to the search
         for band in self.paths_to_raster:
             key = re.findall('B[0-9]+A?|TCI|AOT|WVP|SCL|rgb|DOY', band)
             if len(key) == 0:
