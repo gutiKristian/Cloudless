@@ -127,7 +127,7 @@ class S2CloudlessPerPixel(Task):
             granules = worker.granules[iteration * constraint: (iteration + 1) * constraint]
             for i, g in enumerate(granules, 0):
                 current_doy.append(g.doy)
-                current_masks.append(g["CLD"])
+                current_masks.append(g["CLD"].raster())
                 current_data.append(g.stack_bands(worker.output_bands))
             S2JIT.s2_cloud_probability_analysis(current_data, current_masks, current_doy, result, doy, final_mask)
             del current_data
