@@ -1,13 +1,12 @@
 import numpy as np
-
-from Pipeline.Granule import *
-from Pipeline.utils import *
 from osgeo import gdal
-from typing import Callable
+from typing import Callable, List
 import rasterio
 import os
 from rasterio.profiles import Profile as RasterioProfile
-from Pipeline.utils import profile_for_rgb
+from Pipeline.Granule import S2Granule
+from Pipeline.logger import log
+import Pipeline.utils as util
 
 
 class GranuleCalculator:
@@ -67,7 +66,7 @@ class GranuleCalculator:
             # saving connected with worker
             if path is None:
                 path = "/".join(granule.paths_to_raster[:-1].split(os.path.sep)) + "/" + name
-            x_res, y_res = s2_get_resolution(granule.spatial_resolution)
+            x_res, y_res = util.s2_get_resolution(granule.spatial_resolution)
         else:
             x_res, y_res = raster_img.shape[0], raster_img.shape[1]
 
@@ -123,10 +122,10 @@ class GranuleCalculator:
         if not save:
             return stacked
         for i in range(len(stacked)):
-            stacked[i] = rescale_intensity(stacked[i], 0, 4096)
-        stacked = stacked.astype(numpy.uint8)
+            stacked[i] = util.rescale_intensity(stacked[i], 0, 4096)
+        stacked = stacked.astype(np.uint8)
         profile = granule['B02'].profile
-        profile = profile_for_rgb(profile)
+        profile = util.profile_for_rgb(profile)
         path = GranuleCalculator.save_band_rast(stacked, path, prof=profile, driver="GTiff")
         granule.add_another_band(path, "agriculture")
         return stacked
@@ -138,10 +137,10 @@ class GranuleCalculator:
         if not save:
             return stacked
         for i in range(len(stacked)):
-            stacked[i] = rescale_intensity(stacked[i], 0, 4096)
-        stacked = stacked.astype(numpy.uint8)
+            stacked[i] = util.rescale_intensity(stacked[i], 0, 4096)
+        stacked = stacked.astype(np.uint8)
         profile = granule['B02'].profile
-        profile = profile_for_rgb(profile)
+        profile = util.profile_for_rgb(profile)
         path = GranuleCalculator.save_band_rast(stacked, path, prof=profile)
         granule.add_another_band(path, "infrared")
         return stacked
@@ -153,7 +152,7 @@ class GranuleCalculator:
         b11 = granule['B11'].raster().astype(float)
         m1 = (b8 - b11)
         m2 = (b8 + b11)
-        numpy.divide(m1, m2, out=m1, where=m2 != 0).squeeze()
+        np.divide(m1, m2, out=m1, where=m2 != 0).squeeze()
         if not save:
             return m1
         profile = granule['B8A'].profile
@@ -171,7 +170,7 @@ class GranuleCalculator:
         """
         nir = granule['B8A'].raster().astype(float)
         red = granule['B04'].raster().astype(float)
-        _ndvi = ndvi(red=red, nir=nir)
+        _ndvi = util.ndvi(red=red, nir=nir)
         granule.temp["NDVI"] = _ndvi
         if not save:
             return _ndvi
@@ -243,7 +242,7 @@ class GranuleCalculator:
         for band in bands:
             paths = [g.bands[g.spatial_resolution][band].path for g in granules]  # Paths to raster data
             log.info(f"Band: {band}, paths: {paths}")
-            build_mosaic(path, paths, band + name, band == "rgb", **kwargs)
+            util.build_mosaic(path, paths, band + name, band == "rgb", **kwargs)
 
     @staticmethod
     def info():

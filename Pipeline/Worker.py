@@ -1,13 +1,16 @@
+import os
 import shutil
 import gc
+from typing import List
 
 import Download.Sentinel2
+from Pipeline.Granule import S2Granule
+from Pipeline.GranuleCalculator import GranuleCalculator
 from Pipeline.logger import log
-from Pipeline.GranuleCalculator import *
 from rasterio import dtypes as rastTypes
 from concurrent.futures import ThreadPoolExecutor
 from shapely.geometry import box
-
+import Pipeline.utils as util
 
 class S2Worker:
 
@@ -20,11 +23,11 @@ class S2Worker:
         :param output_bands: bands we work with
         :param polygon: polygon that crops out our data
         """
-        if not is_dir_valid(path):
+        if not util.is_dir_valid(path):
             raise FileNotFoundError("{} may not exist\nPlease check if file exists".format(path))
-        if not s2_is_spatial_correct(spatial_resolution):
+        if not util.s2_is_spatial_correct(spatial_resolution):
             raise Exception("Wrong spatial resolution, please choose between 10, 20 and 60m")
-        if s2_get_resolution(spatial_resolution)[0] % slice_index != 0:
+        if util.s2_get_resolution(spatial_resolution)[0] % slice_index != 0:
             raise Exception("Unable to evenly slice the image! Please use different value, the working resolution is "
                             "{0} and slicing index is {1}")
         self.polygon = polygon
@@ -37,20 +40,20 @@ class S2Worker:
         if len(output_bands) == 0:
             log.info(
                 f"Output bands was {output_bands}, using pre-defined bands for spatial resolution {spatial_resolution}")
-            self.output_bands = bands_for_resolution(spatial_resolution)
+            self.output_bands = util.bands_for_resolution(spatial_resolution)
         #  Path to directory that represents one big tile for instance T33UXW
         self.main_dataset_path = path
         #  Supported spatial resolutions for sentinel 2 are 10m,20m and 60m
         self.spatial_resolution = spatial_resolution
-        self.mercator = extract_mercator(path)
+        self.mercator = util.extract_mercator(path)
         #  Datasets in SAFE format
-        self.datasets = get_subdirectories(path)
+        self.datasets = util.get_subdirectories(path)
         self._validate_files_by_mercator()
         # Initialize granules
         self.granules = []
         for _path in self.datasets:
             try:
-                if s2_is_safe_format(_path):
+                if util.s2_is_safe_format(_path):
                     gr = S2Granule(_path, spatial_resolution, self.output_bands, slice_index, target_projection,
                                    polygon=self.polygon)
                     self.granules.append(gr)
@@ -74,9 +77,9 @@ class S2Worker:
         if len(self.datasets) < 2:
             log.warning("Not enough files to execute cloudless jobs")
         if self.mercator == "":
-            self.mercator = extract_mercator(self.datasets[0])
+            self.mercator = util.extract_mercator(self.datasets[0])
         for file in self.datasets:
-            if extract_mercator(file) != self.mercator:
+            if util.extract_mercator(file) != self.mercator:
                 raise Exception("Tiles with different area detected")
 
     def _save_result(self) -> None:
@@ -121,7 +124,7 @@ class S2Worker:
 
     def get_res(self) -> (int, int):
         if self.polygon is None:
-            return s2_get_resolution(self.spatial_resolution)
+            return util.s2_get_resolution(self.spatial_resolution)
         granule = self.granules[-1]
         band = list(granule.bands[self.spatial_resolution].values())[-1]
         band.load_raster()

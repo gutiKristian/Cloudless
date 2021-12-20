@@ -1,26 +1,23 @@
-import shutil
-
+import os
 from osgeo import gdal
-from Pipeline.utils import *
 import numpy as np
 from Pipeline.logger import log
 import rasterio
-from rasterio import Affine, MemoryFile
-from rasterio.warp import calculate_default_transform, reproject
 import subprocess
-from shapely.geometry import Polygon
 from rasterio.mask import mask
+import Pipeline.utils as util
+
 gdal.UseExceptions()
 
 
 class Band:
     def __init__(self, path: str, load_on_init: bool = False, slice_index: int = 1):
-        if not is_file_valid(path):
+        if not util.is_file_valid(path):
             raise FileNotFoundError("Raster does not exist!")
         if slice_index > 1:
-            if not is_supported_slice(slice_index):
+            if not util.is_supported_slice(slice_index):
                 log.warning("Unsupported slice index, choosing the closest one..")
-                slice_index = find_closest_slice(slice_index)
+                slice_index = util.find_closest_slice(slice_index)
 
         self.path = path
         self.profile = None
@@ -50,7 +47,7 @@ class Band:
                 self.raster_image = self.raster_image.squeeze()
         self._was_raster_read = True
         if self.slice_index > 1:
-            self.raster_image = slice_raster(self.slice_index, self.raster_image)
+            self.raster_image = util.slice_raster(self.slice_index, self.raster_image)
 
     def rasterio_ref(self):
         """

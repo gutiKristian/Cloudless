@@ -3,19 +3,15 @@ from abc import ABC, abstractmethod
 
 import rasterio
 from s2cloudless import S2PixelCloudDetector
-
-from Pipeline.logger import log
-from Pipeline.Worker import S2Worker
-from Pipeline.GranuleCalculator import GranuleCalculator
-from Pipeline.Granule import S2Granule
 import numpy as np
 from Pipeline.Granule import S2Granule
-from Pipeline.utils import *
+from Pipeline.Worker import S2Worker
+from Pipeline.GranuleCalculator import GranuleCalculator
 from numba.typed import List as LIST
 from Pipeline.Mask import S2JIT
 from Pipeline.Detectors import S2Detectors
-from Pipeline.Plotting import *
-from Download.Sentinel2 import Downloader
+from Pipeline.logger import log
+import Pipeline.utils as util
 
 
 class Task(ABC):
@@ -71,8 +67,8 @@ class NdviPerPixel(Task):
         gc.collect()
         log.info("Saving result to the files...")
         worker._save_result()  # Save result into files
-        r, g, b = extract_rgb_paths(worker.save_result_path)
-        create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
+        r, g, b = util.extract_rgb_paths(worker.save_result_path)
+        util.create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
         log.info("Done!")
         worker.release_bands()
         # If there's an intention to work further with the files
@@ -106,13 +102,13 @@ class S2CloudlessPerPixel(Task):
         #  First thing, we will sort the granules based on their doy, so we get the latest result
         worker.granules.sort(key=lambda x: x.doy)
         #  Download the corresponding L1C datasets and compute the mask
-        l1c_granules = [download_l1c(granule) for granule in worker.granules]
+        l1c_granules = [util.download_l1c(granule) for granule in worker.granules]
         # ^They are in the same order as worker granules
 
         # Create cloud masks
         for i, gl1c in enumerate(l1c_granules, 0):
             # Get cld prob
-            path = create_cloud_product(gl1c)
+            path = util.create_cloud_product(gl1c)
             worker.granules[i].add_another_band(path, "CLD")
 
         #  Do the masking
@@ -140,8 +136,8 @@ class S2CloudlessPerPixel(Task):
         worker.result["DOY"] = doy
         log.info("Saving result to the files...")
         worker._save_result()  # Save result into files
-        r, g, b = extract_rgb_paths(worker.save_result_path)
-        create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
+        r, g, b = util.extract_rgb_paths(worker.save_result_path)
+        util.create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
         worker.release_bands()
         # If there's an intention to work further with the files
         return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands + ["rgb"])
@@ -177,8 +173,8 @@ class MedianPerPixel(Task):
             log.info(f"{band_key} done.")
         log.info("Saving result to the files...")
         worker._save_result()  # Save result into files
-        r, g, b = extract_rgb_paths(worker.save_result_path)
-        create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
+        r, g, b = util.extract_rgb_paths(worker.save_result_path)
+        util.create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
         log.info("Done!")
         worker.release_bands()
         # If there's an intention to work further with the files
@@ -192,7 +188,7 @@ class PerTile(Task):
     def perform_computation(worker: S2Worker, detector: S2Detectors = S2Detectors.scl) -> S2Granule:
         log.info(f"Running per-tile masking. Dataset {worker.main_dataset_path}")
         # Gather information
-        res_x, res_y = s2_get_resolution(worker.spatial_resolution)
+        res_x, res_y = util.s2_get_resolution(worker.spatial_resolution)
         slice_index = worker.slice_index
 
         # Check if might proceed to the next step which is per-tile procedure
@@ -201,7 +197,7 @@ class PerTile(Task):
                 raise Exception("Terminating job. Workers with different slice index are not allowed!")
 
         # slice_raster(slice_index, res)  # For easier assignments
-        doy = slice_raster(slice_index, np.zeros(shape=(res_x, res_y), dtype=np.uint16))
+        doy = util.slice_raster(slice_index, np.zeros(shape=(res_x, res_y), dtype=np.uint16))
         log.warning(doy.size)
         # Result array, where we are going to store the result intensities of pixel
         # shape -> bands, slices, x, y
@@ -238,15 +234,15 @@ class PerTile(Task):
                 doy[sl_index] = worker.granules[value].doy
                 res[:, sl_index, :, :] = stack[:, sl_index, :, :]
             stack = None
-        worker.result["DOY"] = glue_raster(doy, res_y, res_x)
+        worker.result["DOY"] = util.glue_raster(doy, res_y, res_x)
         result = np.zeros(shape=(len(worker.output_bands), res_x, res_y), dtype=np.uint16)
         for i in range(len(worker.output_bands)):
-            result[i] = glue_raster(res[i, :, :, :], res_y, res_x)  # (25, 1098, 1098) => (5049, 5049)
+            result[i] = util.glue_raster(res[i, :, :, :], res_y, res_x)  # (25, 1098, 1098) => (5049, 5049)
         # Save it to the result
         for i, band in enumerate(worker.output_bands, 0):
             worker.result[band] = result[i]
         worker._save_result()
-        r, g, b = extract_rgb_paths(worker.save_result_path)
-        create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
+        r, g, b = util.extract_rgb_paths(worker.save_result_path)
+        util.create_rgb_uint8(r, g, b, worker.save_result_path, worker.mercator)
         worker.release_bands()
         return S2Granule(worker.save_result_path, worker.spatial_resolution, worker.output_bands + ["rgb"])

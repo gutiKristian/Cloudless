@@ -1,15 +1,17 @@
+import os
 import re
 from datetime import datetime
+from typing import List, Optional
 from xml.etree import ElementTree  # xml
-
 import numpy as np
 import pyproj
 import shapely.ops
 from osgeo import gdal
-from Pipeline.Band import *
-from Pipeline.utils import *
+
+from Pipeline.Band import Band
 from Pipeline.logger import log
 from shapely.geometry import Polygon
+import Pipeline.utils as util
 
 gdal.UseExceptions()
 
@@ -18,9 +20,9 @@ class S2Granule:
     def __init__(self, path: str, spatial_res: int, desired_bands: List[str], slice_index: int = 1,
                  t_srs: str = 'EPSG:32633', granule_type: str = "L2A", polygon: Optional[Polygon] = None,
                  l1c_id: str = None):
-        if not is_dir_valid(path):
+        if not util.is_dir_valid(path):
             raise FileNotFoundError("Dataset has not been found !")
-        if not supported_granule_type(granule_type):
+        if not util.supported_granule_type(granule_type):
             raise ValueError("This granule type is not supported !")
         self.path = path
         self.spatial_resolution = spatial_res
@@ -29,7 +31,7 @@ class S2Granule:
         self.polygon = polygon
         self.granule_type = granule_type
         self.desired_bands = desired_bands
-        self.meta_data_path = get_metadata_path(self.path, self.granule_type)
+        self.meta_data_path = util.get_metadata_path(self.path, self.granule_type)
         self.meta_data_gdal = None
         self.meta_data = None
         self.data_take = None
@@ -72,16 +74,16 @@ class S2Granule:
         if self.meta_data_gdal is None:
             log.info(f"{self.granule_type} meta-data has not been found in {self.path}")
             # Sentinel images are encoded with JPEG2000 but some processing might have been done so we check for tif too
-            self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
+            self.paths_to_raster = util.get_files_in_directory(self.path, '.jp2')
             if len(self.paths_to_raster) == 0:
-                self.paths_to_raster = get_files_in_directory(self.path, '.tif')
+                self.paths_to_raster = util.get_files_in_directory(self.path, '.tif')
             return
         log.info(f"{os.path.basename(self.meta_data_path)} has been found in {self.path}")
         #  Extract images from xml
         tree = ElementTree.parse(self.meta_data_path)
         root = tree.getroot()
         images = []
-        for image in look_up_raster(root, 'Granule')[0]:
+        for image in util.look_up_raster(root, 'Granule')[0]:
             text = image.text
             if os.name == 'nt':
                 text = text.replace('/', '\\')
@@ -90,11 +92,11 @@ class S2Granule:
         self.paths_to_raster = self.__extract_bands(images)
 
         #  Especially useful when we download meta-data file and only selected bands
-        if not is_file_valid(self.paths_to_raster[0]):
+        if not util.is_file_valid(self.paths_to_raster[0]):
             log.info("File found in meta-data do not exist...\nChecking the directory...")
-            self.paths_to_raster = get_files_in_directory(self.path, '.jp2')
+            self.paths_to_raster = util.get_files_in_directory(self.path, '.jp2')
         else:
-            self.paths_to_raster = verify_bands(images, self.paths_to_raster,
+            self.paths_to_raster = util.verify_bands(images, self.paths_to_raster,
                                                 self.desired_bands, self.spatial_resolution)
         log.info(f"Final paths to raster data {self.paths_to_raster}")
 
@@ -119,7 +121,7 @@ class S2Granule:
             if key in self.desired_bands:
                 b = Band(band, slice_index=self.slice_index)
                 #  Automatically resample band to working spatial resolution
-                if b.profile["width"] != s2_get_resolution(self.spatial_resolution)[0]:
+                if b.profile["width"] != util.s2_get_resolution(self.spatial_resolution)[0]:
                     # b.resample(s2_get_resolution(self.spatial_resolution)[0] / b.profile["width"], delete=True)
                     b.resample_gdal(self.spatial_resolution)
                 e_dict[self.spatial_resolution][key] = b
@@ -183,7 +185,7 @@ class S2Granule:
         :param key - used for lookup inside granule
         """
         b = Band(path_to_band, slice_index=self.slice_index)
-        if b.profile["width"] != s2_get_resolution(self.spatial_resolution)[0]:
+        if b.profile["width"] != util.s2_get_resolution(self.spatial_resolution)[0]:
             # b.resample(s2_get_resolution(self.spatial_resolution)[0] / b.profile["width"], delete=True)
             b.resample_gdal(self.spatial_resolution)
         self.bands[self.spatial_resolution][key] = b

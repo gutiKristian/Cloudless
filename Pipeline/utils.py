@@ -1,20 +1,17 @@
 import os
 import re
-import numpy
-from typing import *
+from typing import List
 
-import numpy as np
+import numpy
 import rasterio
 import glob
 from skimage import exposure
-
-from Download.Sentinel2 import Downloader
 from Pipeline.Granule import S2Granule
 from Pipeline.Task import S2CloudlessPerPixel
-from Pipeline.Worker import S2Worker
 from Pipeline.logger import log
 import subprocess
 from rasterio.enums import Resampling
+import Download.Sentinel2 as Download
 
 USER_NAME = "kristianson12"
 PASSWORD = "mosvegczzz"
@@ -337,7 +334,7 @@ def get_metadata_path(granule_path: str, granule_type: str) -> str:
 # --------------- S2CLOUDLESS UTILS ------------------
 def download_l1c(granule: S2Granule) -> S2Granule:
     working_path_1c = granule.path + os.path.sep + "L1C"
-    downloader = Downloader(USER_NAME, PASSWORD, working_path_1c, granule_identifier=[granule.l1c_identifier])
+    downloader = Download.Downloader(USER_NAME, PASSWORD, working_path_1c, granule_identifier=[granule.l1c_identifier])
     p = list(downloader.download_granule_bands(S2CloudlessPerPixel.bands_l1c))[-1]
     l1c_raster = p + os.path.sep + os.listdir(p)[0]
     # Data will be automatically resampled during the creation of the granule
