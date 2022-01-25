@@ -99,8 +99,8 @@ class S2JIT:
                 _min_val = math.inf
                 index = 0
                 for i in range(len(current_masks)):
-                    #  do not take no data pixels and take the most recent pixels
-                    if 255 > current_masks[i][y, x] <= _min_val:
+                    #  do not take no-data pixels and take the most recent pixels
+                    if current_masks[i][y, x] != 2 and current_masks[i][y, x] <= _min_val:
                         _min_val = current_masks[i][y, x]
                         index = i
                 #  Take the latest pixel with threshold 20 compared with the current and
