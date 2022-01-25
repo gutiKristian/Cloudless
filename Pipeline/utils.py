@@ -12,6 +12,8 @@ from Pipeline.logger import log
 import subprocess
 from rasterio.enums import Resampling
 import Download.Sentinel2 as Download
+from skimage.morphology import disk, square, dilation
+from scipy.ndimage.filters import convolve
 
 USER_NAME = "kristianson12"
 PASSWORD = "mosvegczzz"
@@ -353,6 +355,9 @@ def create_cloud_product(granule: S2Granule, mask=False) -> str:
         product = S2CloudlessPerPixel.cloud_detector.get_cloud_masks(data)
     else:
         product = S2CloudlessPerPixel.cloud_detector.get_cloud_probability_maps(data)
+        _conv = disk(5) / numpy.sum(disk(5))
+        product = convolve(product, _conv)
+
     # Since s2cloudless does not detect no-data value, we need to filter them out here
     # How to get no-data in data variable => transform array (120, 120, 10) to (10, 120, 120)
     # then compare =>  == 0, it gives us 1 where it is zero, squeeze along dimension, it will give us (120, 120)
