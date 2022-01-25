@@ -346,13 +346,22 @@ def create_cloud_product(granule: S2Granule, mask=False) -> str:
     # Input is l1c granule and if we should compute binary mask or prob mask
     assert granule.granule_type == "L1C"
     #  Cloudless time, compute mask
-    data = granule.stack_bands(desired_order=S2CloudlessPerPixel.bands_l1c, dstack=True)
+    data = granule.stack_bands(desired_order=S2CloudlessPerPixel.bands_l1c, dstack=True) / 10000.0
     granule.free_resources()
     product = None
     if mask:
         product = S2CloudlessPerPixel.cloud_detector.get_cloud_masks(data)
     else:
         product = S2CloudlessPerPixel.cloud_detector.get_cloud_probability_maps(data)
+    # Since s2cloudless does not detect no-data value, we need to filter them out here
+    # How to get no-data in data variable => transform array (120, 120, 10) to (10, 120, 120)
+    # then compare =>  == 0, it gives us 1 where it is zero, squeeze along dimension, it will give us (120, 120)
+    # numpy.all => If the image has first pixel in every band 0 then after first two steps we receive for
+    # data[:, 0, 0] = [True, True, ..., True], numpy all squeezes it to True, after all multiply these data with 2
+    data = numpy.all(numpy.transpose(data, (2, 0, 1)) == 0, axis=0)
+    #  mask product with no-data values, no-data -> 2
+    product = numpy.ma.masked_array(data=product, mask=data, fill_value=int(2)).filled()
+
     # obtain profile from parsed band
     band = granule.get_initialized_bands()[-1]
     if len(band) < 1:
