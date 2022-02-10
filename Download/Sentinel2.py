@@ -36,7 +36,6 @@ class Downloader:
                  time_str: str = None, filter_utm: List[str] = None, granule_identifier: List[str] = None):
         """
         TODO: path to credentials folder
-        It is recommended to initialize object via class methods to prevent unexpected results for the user.
         Rules:
             - polygon is always taken as the highest priority argument for the datasets look up, following uuid and
             last is mercator
@@ -509,6 +508,10 @@ class Downloader:
 
     @staticmethod
     def create_polygon(polygon: List) -> Optional[Polygon]:
+        """
+        Used for creating Shapely Polygon instance.
+        Shapely also validates this polygon
+        """
         try:
             p = Polygon(polygon)
             if p.is_valid:
@@ -537,6 +540,9 @@ class Downloader:
     #     return True
 
     def validate_mercator_tiles(self, tiles: List[str]) -> List[str]:
+        """
+        Only ysed if user opted for this. Validates his input.
+        """
         if tiles is None:
             return []
         r = re.compile("^(T?)[\\d]{1,2}[A-Z]{0,3}")

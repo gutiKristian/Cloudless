@@ -21,7 +21,7 @@ class S2Worker:
         :param spatial_resolution: on which we are going to operate on
         :param slice_index: per-pixel: always 1, per-tile from pre-defined choices
         :param output_bands: bands we work with
-        :param polygon: polygon that crops out our data
+        :param polygon: polygon that crops out our data, bbox of this polygon is taken
         """
         if not util.is_dir_valid(path):
             raise FileNotFoundError("{} may not exist\nPlease check if file exists".format(path))
@@ -122,7 +122,7 @@ class S2Worker:
         self.result = {}
         gc.collect()
 
-    def get_res(self) -> (int, int):
+    def get_res(self):
         if self.polygon is None:
             return util.s2_get_resolution(self.spatial_resolution)
         granule = self.granules[-1]
@@ -133,6 +133,7 @@ class S2Worker:
     def get_projection(self):
         if len(self.granules) == 0:
             return None
+        # Each granule (within worker) has the same projection
         return self.granules[-1].get_projection()
 
     def __str__(self):

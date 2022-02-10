@@ -258,6 +258,10 @@ def build_mosaic(destination: str, paths: List[str], name: str = "mosaic", rgb=F
 # --------------- GRANULE UTILS ---------------
 
 def verify_bands(img_paths: List[str], found_imgs: List[str], desired_bands: List[str], spatial: int) -> List[str]:
+    """
+    If user wants band that is not present for 10m spatial res. this finds it (either in 20m or 60m) and 
+    after in the process this raster is resampled to the correct resolution.
+    """
     # Helper function
     def grab_imgs(p, desired, _spatial):
         #  Check whether we would find something in this spatial res.
@@ -335,6 +339,9 @@ def get_metadata_path(granule_path: str, granule_type: str) -> str:
 
 # --------------- S2CLOUDLESS UTILS ------------------
 def download_l1c(granule: S2Granule) -> S2Granule:
+    """
+    Used with S2CLDLESS.
+    """
     working_path_1c = granule.path
     downloader = Download.Downloader(USER_NAME, PASSWORD, working_path_1c, granule_identifier=[granule.l1c_identifier],
                                      product_type="S2MSI1C")
@@ -345,6 +352,9 @@ def download_l1c(granule: S2Granule) -> S2Granule:
 
 
 def create_cloud_product(granule: S2Granule, mask=False) -> str:
+    """
+    Create cloud mask with s2cldless.
+    """
     # Input is l1c granule and if we should compute binary mask or prob mask
     assert granule.granule_type == "L1C"
     #  Cloudless time, compute mask
@@ -355,16 +365,18 @@ def create_cloud_product(granule: S2Granule, mask=False) -> str:
         product = S2CloudlessPerPixel.cloud_detector.get_cloud_masks(data)
     else:
         product = S2CloudlessPerPixel.cloud_detector.get_cloud_probability_maps(data)
-        _conv = disk(5) / numpy.sum(disk(5))
+        _conv = disk(5) / numpy.sum(disk(5)) # avg. filter
         product = convolve(product, _conv)
+    # The flaw of this prob mask is that it has some points that are marked as clear and yet they are cloudy (it's 
+    # sourroundings aswell), maybe try median or avg filtering, maybe max filt.
 
     # Since s2cloudless does not detect no-data value, we need to filter them out here
-    # How to get no-data in data variable => transform array (120, 120, 10) to (10, 120, 120)
-    # then compare =>  == 0, it gives us 1 where it is zero, squeeze along dimension, it will give us (120, 120)
+    # How to get no-data in "data" variable => transform array (120, 120, 10) to (10, 120, 120)
+    # then compare =>  == 0, it gives us 1 where it is zero (no-data value), squeeze along dimension, it will give us (120, 120)
     # numpy.all => If the image has first pixel in every band 0 then after first two steps we receive for
     # data[:, 0, 0] = [True, True, ..., True], numpy all squeezes it to True, after all multiply these data with 2
     data = numpy.all(numpy.transpose(data, (2, 0, 1)) == 0, axis=0)
-    #  mask product with no-data values, no-data -> 2
+    #  mask product with no-data values, no-data -> 2 and cloud. prob. in interval [0, 1]
     product = numpy.ma.masked_array(data=product, mask=data, fill_value=int(2)).filled()
 
     # obtain profile from parsed band
