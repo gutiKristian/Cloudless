@@ -146,7 +146,7 @@ class TestPipeline:
         c = TestPipeline.granule["SCL"].raster()
         #  All no data
         TestPipeline.granule.bands[60]["SCL"].raster_image = c * 0
-        expected_sum = 3348900
+        expected_sum = 33489000
         assert expected_sum == S2Detectors.scl(TestPipeline.granule).sum()
         #  No cloud test
         TestPipeline.granule.bands[60]["SCL"].raster_image = c * 0 + 3
